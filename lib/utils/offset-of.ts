@@ -1,4 +1,3 @@
-/** @internal */
 interface NativePointer {
     offsetOf(condition: (handle: NativePointer) => boolean, depth?: number): number | null;
 }

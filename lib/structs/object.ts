@@ -1,5 +1,8 @@
 namespace Il2Cpp {
     export class Object extends NativeStruct {
+        /** Available in implementation block. */
+        currentMethod?: Il2Cpp.Method;
+
         /** Gets the Il2CppObject struct size, possibly equal to `Process.pointerSize * 2`. */
         @lazy
         static get headerSize(): number {
@@ -59,11 +62,6 @@ namespace Il2Cpp {
         @lazy
         get class(): Il2Cpp.Class {
             return new Il2Cpp.Class(Il2Cpp.exports.objectGetClass(this));
-        }
-
-        /** Returns a monitor for this object. */
-        get monitor(): Il2Cpp.Object.Monitor {
-            return new Il2Cpp.Object.Monitor(this);
         }
 
         /** Gets the size of the current object. */
@@ -145,48 +143,6 @@ namespace Il2Cpp {
         /** Creates a weak reference to this object. */
         weakRef(trackResurrection: boolean): Il2Cpp.GCHandle {
             return new Il2Cpp.GCHandle(Il2Cpp.exports.gcHandleNewWeakRef(this, +trackResurrection));
-        }
-    }
-
-    export namespace Object {
-        export class Monitor {
-            /** @internal */
-            constructor(/** @internal */ readonly handle: NativePointerValue) {}
-
-            /** Acquires an exclusive lock on the current object. */
-            enter(): void {
-                return Il2Cpp.exports.monitorEnter(this.handle);
-            }
-
-            /** Release an exclusive lock on the current object. */
-            exit(): void {
-                return Il2Cpp.exports.monitorExit(this.handle);
-            }
-
-            /** Notifies a thread in the waiting queue of a change in the locked object's state. */
-            pulse(): void {
-                return Il2Cpp.exports.monitorPulse(this.handle);
-            }
-
-            /** Notifies all waiting threads of a change in the object's state. */
-            pulseAll(): void {
-                return Il2Cpp.exports.monitorPulseAll(this.handle);
-            }
-
-            /** Attempts to acquire an exclusive lock on the current object. */
-            tryEnter(timeout: number): boolean {
-                return !!Il2Cpp.exports.monitorTryEnter(this.handle, timeout);
-            }
-
-            /** Releases the lock on an object and attempts to block the current thread until it reacquires the lock. */
-            tryWait(timeout: number): boolean {
-                return !!Il2Cpp.exports.monitorTryWait(this.handle, timeout);
-            }
-
-            /** Releases the lock on an object and blocks the current thread until it reacquires the lock. */
-            wait(): void {
-                return Il2Cpp.exports.monitorWait(this.handle);
-            }
         }
     }
 }

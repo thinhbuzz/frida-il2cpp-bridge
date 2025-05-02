@@ -1,8 +1,13 @@
 namespace Il2Cpp {
+    export let firstInitialize = false;
     /** Attaches the caller thread to Il2Cpp domain and executes the given block.  */
     export async function perform<T>(block: () => T | Promise<T>, flag: "free" | "bind" | "leak" | "main" = "bind"): Promise<T> {
         let attachedThread: Il2Cpp.Thread | null = null;
         try {
+            if (!firstInitialize) {
+                await asyncSleep();
+                firstInitialize = true;
+            }
             const isInMainThread = await initialize(flag == "main");
 
             if (flag == "main" && !isInMainThread) {

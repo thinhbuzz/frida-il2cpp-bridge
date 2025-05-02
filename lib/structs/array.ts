@@ -6,7 +6,7 @@ namespace Il2Cpp {
             return Il2Cpp.corlib.class("System.Array").instanceSize;
         }
 
-        /** @internal Gets a pointer to the first element of the current array. */
+        /** Gets a pointer to the first element of the current array. */
         get elements(): Il2Cpp.Pointer<T> {
             // We previosly obtained an array whose content is known by calling
             // 'System.String::Split(NULL)' on a known string. However, that
@@ -86,7 +86,6 @@ namespace Il2Cpp {
     /** Creates a new array with the given elements. */
     export function array<T extends Il2Cpp.Field.Type>(klass: Il2Cpp.Class, elements: T[]): Il2Cpp.Array<T>;
 
-    /** @internal */
     export function array<T extends Il2Cpp.Field.Type>(klass: Il2Cpp.Class, lengthOrElements: number | T[]): Il2Cpp.Array<T> {
         const length = typeof lengthOrElements == "number" ? lengthOrElements : lengthOrElements.length;
         const array = new Il2Cpp.Array<T>(Il2Cpp.exports.arrayNew(klass, length));

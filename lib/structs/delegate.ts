@@ -30,6 +30,6 @@ namespace Il2Cpp {
         return delegate;
     }
 
-    /** @internal Used to prevent eager garbage collection against NativeCallbacks. */
+    /** Used to prevent eager garbage collection against NativeCallbacks. */
     export const _callbacksToKeepAlive: Record<string, NativeCallback<"void", []> | undefined> = {};
 }

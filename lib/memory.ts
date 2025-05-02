@@ -23,7 +23,6 @@ namespace Il2Cpp {
         return Il2Cpp.exports.free(pointer);
     }
 
-    /** @internal */
     export function read(pointer: NativePointer, type: Il2Cpp.Type): Il2Cpp.Field.Type {
         switch (type.enumValue) {
             case Il2Cpp.Type.Enum.BOOLEAN:
@@ -72,7 +71,6 @@ namespace Il2Cpp {
         raise(`couldn't read the value from ${pointer} using an unhandled or unknown type ${type.name} (${type.enumValue}), please file an issue`);
     }
 
-    /** @internal */
     export function write(pointer: NativePointer, value: any, type: Il2Cpp.Type): NativePointer {
         switch (type.enumValue) {
             case Il2Cpp.Type.Enum.BOOLEAN:
@@ -117,13 +115,10 @@ namespace Il2Cpp {
         raise(`couldn't write value ${value} to ${pointer} using an unhandled or unknown type ${type.name} (${type.enumValue}), please file an issue`);
     }
 
-    /** @internal */
     export function fromFridaValue(value: NativeCallbackArgumentValue, type: Il2Cpp.Type): Il2Cpp.Parameter.Type;
 
-    /** @internal */
     export function fromFridaValue(value: NativeFunctionReturnValue, type: Il2Cpp.Type): Il2Cpp.Method.ReturnType;
 
-    /** @internal */
     export function fromFridaValue(
         value: NativeCallbackArgumentValue | NativeFunctionReturnValue,
         type: Il2Cpp.Type
@@ -167,13 +162,10 @@ namespace Il2Cpp {
         }
     }
 
-    /** @internal */
     export function toFridaValue(value: Il2Cpp.Method.ReturnType): NativeFunctionReturnValue;
 
-    /** @internal */
     export function toFridaValue(value: Il2Cpp.Parameter.Type): NativeFunctionArgumentValue;
 
-    /** @internal */
     export function toFridaValue(value: Il2Cpp.Parameter.Type | Il2Cpp.Method.ReturnType): NativeFunctionArgumentValue | NativeFunctionReturnValue {
         if (typeof value == "boolean") {
             return +value;

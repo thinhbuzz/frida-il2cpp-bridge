@@ -30,7 +30,7 @@ namespace Il2Cpp {
                 types.push(parameter.type.fridaAlias);
             }
 
-            if (!this.isStatic || Il2Cpp.unityVersionIsBelow201830) {
+            if (!this.isStatic) {
                 types.unshift("pointer");
             }
 
@@ -107,7 +107,6 @@ namespace Il2Cpp {
             return Il2Cpp.exports.methodGetName(this).readUtf8String()!;
         }
 
-        /** @internal */
         @lazy
         get nativeFunction(): NativeFunction<any, any> {
             return new NativeFunction(this.virtualAddress, this.returnType.fridaAlias, this.fridaSignature as NativeFunctionArgumentType[]);
@@ -219,11 +218,10 @@ namespace Il2Cpp {
             return this.invokeRaw(NULL, ...parameters);
         }
 
-        /** @internal */
         invokeRaw(instance: NativePointerValue, ...parameters: Il2Cpp.Parameter.Type[]): T {
             const allocatedParameters = parameters.map(toFridaValue);
 
-            if (!this.isStatic || Il2Cpp.unityVersionIsBelow201830) {
+            if (!this.isStatic) {
                 allocatedParameters.unshift(instance);
             }
 
@@ -260,7 +258,6 @@ namespace Il2Cpp {
             );
         }
 
-        /** @internal */
         *overloads(): Generator<Il2Cpp.Method> {
             for (const klass of this.class.hierarchy()) {
                 for (const method of klass.methods) {
@@ -368,7 +365,6 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
         }
 
         /**
-         * @internal
          * Binds the current method to a {@link Il2Cpp.Object} or a
          * {@link Il2Cpp.ValueType} (also known as *instances*), so that it is
          * possible to invoke it - see {@link Il2Cpp.Method.invoke} for
@@ -425,9 +421,8 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
             });
         }
 
-        /** @internal */
         wrap(block: (this: Il2Cpp.Class | Il2Cpp.Object | Il2Cpp.ValueType, ...parameters: Il2Cpp.Parameter.Type[]) => T): NativeCallback<any, any> {
-            const startIndex = +!this.isStatic | +Il2Cpp.unityVersionIsBelow201830;
+            const startIndex = +!this.isStatic;
             return new NativeCallback(
                 (...args: NativeCallbackArgumentValue[]): NativeCallbackReturnValue => {
                     const thisObject = this.isStatic
@@ -435,6 +430,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                         : this.class.isValueType
                         ? new Il2Cpp.ValueType((args[0] as NativePointer).add(Il2Cpp.Object.headerSize - maybeObjectHeaderSize()), this.class.type)
                         : new Il2Cpp.Object(args[0] as NativePointer);
+                    thisObject.currentMethod = this.isStatic ? this : this.bind(thisObject as (Il2Cpp.Object | Il2Cpp.ValueType));
 
                     const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
                     const result = block.call(thisObject, ...parameters);
@@ -488,49 +484,49 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
 
         export const enum Attributes {
             MemberAccessMask = 0x0007,
-            PrivateScope = 0x0000,
+            // PrivateScope = 0x0000,
             Private = 0x0001,
             FamilyAndAssembly = 0x0002,
             Assembly = 0x0003,
             Family = 0x0004,
             FamilyOrAssembly = 0x0005,
             Public = 0x0006,
-            Static = 0x0010,
-            Final = 0x0020,
-            Virtual = 0x0040,
-            HideBySig = 0x0080,
-            CheckAccessOnOverride = 0x0200,
-            VtableLayoutMask = 0x0100,
-            ReuseSlot = 0x0000,
-            NewSlot = 0x0100,
-            Abstract = 0x0400,
-            SpecialName = 0x0800,
-            PinvokeImpl = 0x2000,
-            UnmanagedExport = 0x0008,
-            RTSpecialName = 0x1000,
-            ReservedMask = 0xd000,
-            HasSecurity = 0x4000,
-            RequireSecObject = 0x8000
+            // Static = 0x0010,
+            // Final = 0x0020,
+            // Virtual = 0x0040,
+            // HideBySig = 0x0080,
+            // CheckAccessOnOverride = 0x0200,
+            // VtableLayoutMask = 0x0100,
+            // ReuseSlot = 0x0000,
+            // NewSlot = 0x0100,
+            // Abstract = 0x0400,
+            // SpecialName = 0x0800,
+            // PinvokeImpl = 0x2000,
+            // UnmanagedExport = 0x0008,
+            // RTSpecialName = 0x1000,
+            // ReservedMask = 0xd000,
+            // HasSecurity = 0x4000,
+            // RequireSecObject = 0x8000
         }
 
         export const enum ImplementationAttribute {
-            CodeTypeMask = 0x0003,
-            IntermediateLanguage = 0x0000,
-            Native = 0x0001,
-            OptimizedIntermediateLanguage = 0x0002,
-            Runtime = 0x0003,
-            ManagedMask = 0x0004,
-            Unmanaged = 0x0004,
-            Managed = 0x0000,
-            ForwardRef = 0x0010,
-            PreserveSig = 0x0080,
+            // CodeTypeMask = 0x0003,
+            // IntermediateLanguage = 0x0000,
+            // Native = 0x0001,
+            // OptimizedIntermediateLanguage = 0x0002,
+            // Runtime = 0x0003,
+            // ManagedMask = 0x0004,
+            // Unmanaged = 0x0004,
+            // Managed = 0x0000,
+            // ForwardRef = 0x0010,
+            // PreserveSig = 0x0080,
             InternalCall = 0x1000,
             Synchronized = 0x0020,
-            NoInlining = 0x0008,
-            AggressiveInlining = 0x0100,
-            NoOptimization = 0x0040,
-            SecurityMitigations = 0x0400,
-            MaxMethodImplVal = 0xffff
+            // NoInlining = 0x0008,
+            // AggressiveInlining = 0x0100,
+            // NoOptimization = 0x0040,
+            // SecurityMitigations = 0x0400,
+            // MaxMethodImplVal = 0xffff
         }
     }
 }

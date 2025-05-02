@@ -13,11 +13,6 @@ namespace Il2Cpp {
      * On iOS and macOS, IL2CPP exports may be located within a module having
      * a different name.
      *
-     * In any case, it is possible to override or set the IL2CPP module name
-     * using {@link Il2Cpp.$config.moduleName}:
-     * ```ts
-     * Il2Cpp.$config.moduleName = "CustomName.dylib";
-     *
      * Il2Cpp.perform(() => {
      *     // ...
      * });
@@ -29,30 +24,10 @@ namespace Il2Cpp {
     });
 
     /**
-     * @internal
      * Waits for the IL2CPP native library to be loaded and initialized.
      */
     export async function initialize(blocking = false): Promise<boolean> {
-        const module =
-            tryModule() ??
-            (await new Promise<Module>(resolve => {
-                const [moduleName, fallbackModuleName] = getExpectedModuleNames();
-                const moduleObserver = Process.attachModuleObserver({
-                    onAdded(module: Module) {
-                        if (module.name == moduleName || (fallbackModuleName && module.name == fallbackModuleName)) {
-                            moduleObserver.detach();
-                            clearTimeout(timeout);
-                            resolve(module);
-                        }
-                    }
-                });
-
-                const timeout = setTimeout(() => {
-                    warn(`after 10 seconds, IL2CPP module '${moduleName}' has not been loaded yet, is the app running?`);
-                }, 10000);
-            }));
-
-        Reflect.defineProperty(Il2Cpp, "module", { value: module });
+        Reflect.defineProperty(Il2Cpp, "module", { value: await forModule(getExpectedModuleName()) });
 
         // At this point, the IL2CPP native library has been loaded, but we
         // cannot interact with IL2CPP until `il2cpp_init` is done.
@@ -73,29 +48,15 @@ namespace Il2Cpp {
     }
 
     function tryModule(): Module | undefined {
-        const [moduleName, fallback] = getExpectedModuleNames();
+        const moduleName = getExpectedModuleName();
         return (
             Process.findModuleByName(moduleName) ??
-            Process.findModuleByName(fallback ?? moduleName) ??
             Process.findModuleByAddress(DebugSymbol.fromName("il2cpp_init").address) ??
             undefined
         );
     }
 
-    function getExpectedModuleNames(): [string] | [string, string] {
-        if (Il2Cpp.$config.moduleName) {
-            return [Il2Cpp.$config.moduleName];
-        }
-
-        switch (Process.platform) {
-            case "linux":
-                return [Android.apiLevel ? "libil2cpp.so" : "GameAssembly.so"];
-            case "windows":
-                return ["GameAssembly.dll"];
-            case "darwin":
-                return ["UnityFramework", "GameAssembly.dylib"];
-        }
-
-        raise(`${Process.platform} is not supported yet`);
+    function getExpectedModuleName(): string {
+        return 'libil2cpp.so';
     }
 }

@@ -1,5 +1,8 @@
 namespace Il2Cpp {
     export class ValueType extends NativeStruct {
+        /** Available in implementation block. */
+        currentMethod?: Il2Cpp.Method;
+
         constructor(handle: NativePointer, readonly type: Il2Cpp.Type) {
             super(handle);
         }

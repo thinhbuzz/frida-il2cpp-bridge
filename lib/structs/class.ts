@@ -1,6 +1,9 @@
 namespace Il2Cpp {
     @recycle
     export class Class extends NativeStruct {
+        /** Available in implementation block. */
+        currentMethod?: Il2Cpp.Method;
+
         /** Gets the actual size of the instance of the current class. */
         get actualInstanceSize(): number {
             const SystemString = Il2Cpp.corlib.class("System.String");

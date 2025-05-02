@@ -1,6 +1,5 @@
 namespace Il2Cpp {
     export class GCHandle {
-        /** @internal */
         constructor(readonly handle: number) {}
 
         /** Gets the object associated to this handle. */

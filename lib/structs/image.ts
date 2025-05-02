@@ -10,34 +10,13 @@ namespace Il2Cpp {
         /** Gets the amount of classes defined in this image. */
         @lazy
         get classCount(): number {
-            if (Il2Cpp.unityVersionIsBelow201830) {
-                return this.classes.length;
-            } else {
-                return Il2Cpp.exports.imageGetClassCount(this);
-            }
+            return Il2Cpp.exports.imageGetClassCount(this);
         }
 
         /** Gets the classes defined in this image. */
         @lazy
         get classes(): Il2Cpp.Class[] {
-            if (Il2Cpp.unityVersionIsBelow201830) {
-                const types = this.assembly.object.method<Il2Cpp.Array<Il2Cpp.Object>>("GetTypes").invoke(false);
-                // In Unity 5.3.8f1, getting System.Reflection.Emit.OpCodes type name
-                // without iterating all the classes first somehow blows things up at
-                // app startup, hence the `Array.from`.
-                const classes = globalThis.Array.from(types, _ => new Il2Cpp.Class(Il2Cpp.exports.classFromObject(_)));
-
-                // <Module> class does not always exist
-                // https://github.com/vfsfitvnm/frida-il2cpp-bridge/issues/627
-                const Module = this.tryClass("<Module>");
-                if (Module) {
-                    classes.unshift(Module);
-                }
-
-                return classes;
-            } else {
-                return globalThis.Array.from(globalThis.Array(this.classCount), (_, i) => new Il2Cpp.Class(Il2Cpp.exports.imageGetClass(this, i)));
-            }
+            return globalThis.Array.from(globalThis.Array(this.classCount), (_, i) => new Il2Cpp.Class(Il2Cpp.exports.imageGetClass(this, i)));
         }
 
         /** Gets the name of this image. */

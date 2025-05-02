@@ -6,20 +6,17 @@ namespace Il2Cpp {
                 return this.internal.field<UInt64>("thread_id").value.toNumber();
             };
 
-            // https://github.com/mono/linux-packaging-mono/blob/d586f84dfea30217f34b076a616a098518aa72cd/mono/utils/mono-threads.h#L642
-            if (Process.platform != "windows") {
-                const currentThreadId = Process.getCurrentThreadId();
-                const currentPosixThread = ptr(get.apply(Il2Cpp.currentThread!));
+            const currentThreadId = Process.getCurrentThreadId();
+            const currentPosixThread = ptr(get.apply(Il2Cpp.currentThread!));
 
-                // prettier-ignore
-                const offset = currentPosixThread.offsetOf(_ => _.readS32() == currentThreadId, 1024) ??
-                    raise(`couldn't find the offset for determining the kernel id of a posix thread`);
+            // prettier-ignore
+            const offset = currentPosixThread.offsetOf(_ => _.readS32() == currentThreadId, 1024) ??
+              raise(`couldn't find the offset for determining the kernel id of a posix thread`);
 
-                const _get = get;
-                get = function (this: Il2Cpp.Thread) {
-                    return ptr(_get.apply(this)).add(offset).readS32();
-                };
-            }
+            const _get = get;
+            get = function (this: Il2Cpp.Thread) {
+                return ptr(_get.apply(this)).add(offset).readS32();
+            };
 
             getter(Il2Cpp.Thread.prototype, "id", get, lazy);
 
@@ -50,13 +47,11 @@ namespace Il2Cpp {
             return new Il2Cpp.Object(this);
         }
 
-        /** @internal */
         @lazy
         private get staticData(): NativePointer {
             return this.internal.field<NativePointer>("static_data").value;
         }
 
-        /** @internal */
         @lazy
         private get synchronizationContext(): Il2Cpp.Object | null {
             const get_ExecutionContext = this.object.tryMethod<Il2Cpp.Object>("GetMutableExecutionContext") ?? this.object.method("get_ExecutionContext");
@@ -87,9 +82,10 @@ namespace Il2Cpp {
             if (Post == null) {
                 return Process.runOnThread(this.id, block);
             }
+            let delegate: Object | null = null;
 
             return new Promise(resolve => {
-                const delegate = Il2Cpp.delegate(Il2Cpp.corlib.class("System.Threading.SendOrPostCallback"), () => {
+                delegate = Il2Cpp.delegate(Il2Cpp.corlib.class('System.Threading.SendOrPostCallback'), () => {
                     const result = block();
                     setImmediate(() => resolve(result));
                 });
@@ -109,14 +105,18 @@ namespace Il2Cpp {
                 // The following solution, which basically redirects the invocation to a native function that
                 // survives the script reloading, is much simpler, honestly.
                 Script.bindWeak(globalThis, () => {
-                    delegate.field("method_ptr").value = delegate.field("invoke_impl").value = Il2Cpp.exports.domainGet;
+                    delegate!.field('method_ptr').value = delegate!.field('invoke_impl').value = Il2Cpp.exports.domainGet;
                 });
 
                 Post.invoke(delegate, NULL);
-            });
+            })
+              .finally(() => {
+                  if (delegate) {
+                      delete Il2Cpp._callbacksToKeepAlive[delegate.handle.toString()];
+                  }
+              }) as Promise<T>;
         }
 
-        /** @internal */
         tryLocalValue(klass: Il2Cpp.Class): Il2Cpp.Object | undefined {
             for (let i = 0; i < 16; i++) {
                 const base = this.staticData.add(i * Process.pointerSize).readPointer();

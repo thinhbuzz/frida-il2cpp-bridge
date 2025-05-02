@@ -122,7 +122,6 @@ ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)
         }
 
         /**
-         * @internal
          * Binds the current field to a {@link Il2Cpp.Object} or a
          * {@link Il2Cpp.ValueType} (also known as *instances*), so that it is
          * possible to retrieve its value - see {@link Il2Cpp.Field.value} for
@@ -184,7 +183,7 @@ ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)
 
         export const enum Attributes {
             FieldAccessMask = 0x0007,
-            PrivateScope = 0x0000,
+            // PrivateScope = 0x0000,
             Private = 0x0001,
             FamilyAndAssembly = 0x0002,
             Assembly = 0x0003,
@@ -192,16 +191,16 @@ ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)
             FamilyOrAssembly = 0x0005,
             Public = 0x0006,
             Static = 0x0010,
-            InitOnly = 0x0020,
+            // InitOnly = 0x0020,
             Literal = 0x0040,
-            NotSerialized = 0x0080,
-            SpecialName = 0x0200,
-            PinvokeImpl = 0x2000,
-            ReservedMask = 0x9500,
-            RTSpecialName = 0x0400,
-            HasFieldMarshal = 0x1000,
-            HasDefault = 0x8000,
-            HasFieldRVA = 0x0100
+            // NotSerialized = 0x0080,
+            // SpecialName = 0x0200,
+            // PinvokeImpl = 0x2000,
+            // ReservedMask = 0x9500,
+            // RTSpecialName = 0x0400,
+            // HasFieldMarshal = 0x1000,
+            // HasDefault = 0x8000,
+            // HasFieldRVA = 0x0100
         }
     }
 }
