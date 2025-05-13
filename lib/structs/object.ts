@@ -1,5 +1,8 @@
 namespace Il2Cpp {
     export class Object extends NativeStruct {
+        /** Available in implementation block. */
+        currentMethod?: Il2Cpp.Method;
+
         /** Gets the Il2CppObject struct size, possibly equal to `Process.pointerSize * 2`. */
         @lazy
         static get headerSize(): number {

@@ -154,7 +154,7 @@ namespace Il2Cpp {
             const FilterTypeNameMethod = FilterTypeName.field<NativePointer>("method").value;
 
             // prettier-ignore
-            const offset = FilterTypeNameMethod.offsetOf(_ => _.readPointer().equals(FilterTypeNameMethodPointer)) 
+            const offset = FilterTypeNameMethod.offsetOf(_ => _.readPointer().equals(FilterTypeNameMethodPointer))
                 ?? raise("couldn't find the virtual address offset in the native method struct");
 
             // prettier-ignore
@@ -439,6 +439,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                               this.class.type
                           )
                         : new Il2Cpp.Object(args[0] as NativePointer);
+                    thisObject.currentMethod = this.isStatic ? this : this.bind(thisObject as (Il2Cpp.Object | Il2Cpp.ValueType));
 
                     const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
                     const result = block.call(thisObject, ...parameters);
