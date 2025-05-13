@@ -9,7 +9,7 @@ namespace Il2Cpp {
             const SystemString = Il2Cpp.corlib.class("System.String");
 
             // prettier-ignore
-            const offset = SystemString.handle.offsetOf(_ => _.readInt() == SystemString.instanceSize - 2) 
+            const offset = SystemString.handle.offsetOf(_ => _.readInt() == SystemString.instanceSize - 2)
                 ?? raise("couldn't find the actual instance size offset in the native class struct");
 
             // prettier-ignore
