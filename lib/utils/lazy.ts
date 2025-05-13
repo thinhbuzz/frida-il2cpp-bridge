@@ -18,3 +18,7 @@ function lazy(_: any, propertyKey: PropertyKey, descriptor: PropertyDescriptor) 
     };
     return descriptor;
 }
+
+namespace Il2Cpp {
+    export const cache = lazy;
+}
