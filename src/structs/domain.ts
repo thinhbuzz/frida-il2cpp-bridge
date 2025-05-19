@@ -1,45 +1,51 @@
-namespace Il2Cpp {
-    @recycle
-    export class Domain extends NativeStruct {
-        /** Gets the assemblies that have been loaded into the execution context of the application domain. */
-        @lazy
-        get assemblies(): Il2Cpp.Assembly[] {
-            let handles = readNativeList(_ => Il2Cpp.api.domainGetAssemblies(this, _));
+import { domainGet, domainGetAssemblies, threadAttach, domainGetAssemblyFromName } from '../api';
+import { raise } from '../utils/console';
+import { lazy, lazyValue } from '../utils/lazy';
+import { NativeStruct } from '../utils/native-struct';
+import { readNativeList } from '../utils/read-native-list';
+import { recycle } from '../utils/recycle';
+import { Array } from './array';
+import { Assembly } from './assembly';
+import { corlib } from './image';
+import { Object } from './object';
+import { Thread } from './thread';
 
-            if (handles.length == 0) {
-                const assemblyObjects = this.object.method<Il2Cpp.Array<Il2Cpp.Object>>("GetAssemblies").overload().invoke();
-                handles = globalThis.Array.from(assemblyObjects).map(_ => _.field<NativePointer>("_mono_assembly").value);
-            }
+@recycle
+export class Domain extends NativeStruct {
+    /** Gets the assemblies that have been loaded into the execution context of the application domain. */
+    @lazy
+    get assemblies(): Assembly[] {
+        let handles = readNativeList(_ => domainGetAssemblies.value(this, _));
 
-            return handles.map(_ => new Il2Cpp.Assembly(_));
+        if (handles.length == 0) {
+            const assemblyObjects = this.object.method<Array<Object>>('GetAssemblies').overload().invoke();
+            handles = globalThis.Array.from(assemblyObjects).map(_ => _.field<NativePointer>('_mono_assembly').value);
         }
 
-        /** Gets the encompassing object of the application domain. */
-        @lazy
-        get object(): Il2Cpp.Object {
-            return Il2Cpp.corlib.class("System.AppDomain").method<Il2Cpp.Object>("get_CurrentDomain").invoke();
-        }
-
-        /** Opens and loads the assembly with the given name. */
-        assembly(name: string): Il2Cpp.Assembly {
-            return this.tryAssembly(name) ?? raise(`couldn't find assembly ${name}`);
-        }
-
-        /** Attached a new thread to the application domain. */
-        attach(): Il2Cpp.Thread {
-            return new Il2Cpp.Thread(Il2Cpp.api.threadAttach(this));
-        }
-
-        /** Opens and loads the assembly with the given name. */
-        tryAssembly(name: string): Il2Cpp.Assembly | null {
-            return new Il2Cpp.Assembly(Il2Cpp.api.domainGetAssemblyFromName(this, Memory.allocUtf8String(name))).asNullable();
-        }
+        return handles.map(_ => new Assembly(_));
     }
 
-    /** Gets the application domain. */
-    export declare const domain: Il2Cpp.Domain;
-    // prettier-ignore
-    getter(Il2Cpp, "domain", () => {
-        return new Il2Cpp.Domain(Il2Cpp.api.domainGet());
-    }, lazy);
+    /** Gets the encompassing object of the application domain. */
+    @lazy
+    get object(): Object {
+        return corlib.value.class('System.AppDomain').method<Object>('get_CurrentDomain').invoke();
+    }
+
+    /** Opens and loads the assembly with the given name. */
+    assembly(name: string): Assembly {
+        return this.tryAssembly(name) ?? raise(`couldn't find assembly ${name}`);
+    }
+
+    /** Attached a new thread to the application domain. */
+    attach(): Thread {
+        return new Thread(threadAttach.value(this));
+    }
+
+    /** Opens and loads the assembly with the given name. */
+    tryAssembly(name: string): Assembly | null {
+        return new Assembly(domainGetAssemblyFromName.value(this, Memory.allocUtf8String(name))).asNullable();
+    }
 }
+
+/** Gets the application domain. */
+export const domain = lazyValue(() => new Domain(domainGet.value()));

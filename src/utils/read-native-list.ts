@@ -1,5 +1,4 @@
-/** @internal */
-function readNativeList(block: (lengthPointer: NativePointer) => NativePointer): NativePointer[] {
+export function readNativeList(block: (lengthPointer: NativePointer) => NativePointer): NativePointer[] {
     const lengthPointer = Memory.alloc(Process.pointerSize);
     const startPointer = block(lengthPointer);
 

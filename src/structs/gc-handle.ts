@@ -1,16 +1,18 @@
-namespace Il2Cpp {
-    export class GCHandle {
-        /** @internal */
-        constructor(readonly handle: number) {}
+import { gcHandleGetTarget, gcHandleFree } from '../api';
+import { Object } from './object';
 
-        /** Gets the object associated to this handle. */
-        get target(): Il2Cpp.Object | null {
-            return new Il2Cpp.Object(Il2Cpp.api.gcHandleGetTarget(this.handle)).asNullable();
-        }
+export class GCHandle {
 
-        /** Frees this handle. */
-        free(): void {
-            return Il2Cpp.api.gcHandleFree(this.handle);
-        }
+    constructor(readonly handle: number) {
+    }
+
+    /** Gets the object associated to this handle. */
+    get target(): Object | null {
+        return new Object(gcHandleGetTarget.value(this.handle)).asNullable();
+    }
+
+    /** Frees this handle. */
+    free(): void {
+        return gcHandleFree.value(this.handle);
     }
 }

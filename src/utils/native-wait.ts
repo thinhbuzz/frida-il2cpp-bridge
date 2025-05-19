@@ -1,22 +1,23 @@
-/** @internal */
-interface ResolvedExport {
+import { apiLevel } from './android';
+import { raise, warn } from './console';
+
+export interface ResolvedExport {
     handle: NativePointer;
     readString: (handle: NativePointer) => string | null;
 }
 
-/** @internal */
-function forModule(...moduleNames: string[]): Promise<Module> {
-    function find(
-        moduleName: string | null,
-        name: string,
-        readString: (handle: NativePointer) => string | null = _ => _.readUtf8String()
-    ): ResolvedExport | undefined {
-        const handle = Module.findExportByName(moduleName, name) ?? NULL;
-        if (!handle.isNull()) {
-            return { handle, readString };
-        }
+export function find(
+    moduleName: string | null,
+    name: string,
+    readString: (handle: NativePointer) => string | null = _ => _.readUtf8String(),
+): ResolvedExport | undefined {
+    const handle = Module.findExportByName(moduleName, name) ?? NULL;
+    if (!handle.isNull()) {
+        return { handle, readString };
     }
+}
 
+export function forModule(...moduleNames: string[]): Promise<Module> {
     return new Promise<Module>(resolve => {
         for (const moduleName of moduleNames) {
             const module = Process.findModuleByName(moduleName);
@@ -29,9 +30,9 @@ function forModule(...moduleNames: string[]): Promise<Module> {
         let targets: (ResolvedExport | undefined)[] = [];
 
         switch (Process.platform) {
-            case "linux":
-                if (Android.apiLevel == null) {
-                    targets = [find(null, "dlopen")];
+            case 'linux':
+                if (apiLevel.value == null) {
+                    targets = [find(null, 'dlopen')];
                     break;
                 }
 
@@ -39,20 +40,20 @@ function forModule(...moduleNames: string[]): Promise<Module> {
                 // A6, A7: __dl_open
                 // A8, A8.1: __dl__Z8__dlopenPKciPKv
                 // A9, A10, A12, A13: __dl___loader_dlopen
-                targets = (Process.findModuleByName("linker64") ?? Process.getModuleByName("linker"))
+                targets = (Process.findModuleByName('linker64') ?? Process.getModuleByName('linker'))
                     .enumerateSymbols()
-                    .filter(_ => ["__dl___loader_dlopen", "__dl__Z8__dlopenPKciPKv", "__dl_open"].includes(_.name))
+                    .filter(_ => ['__dl___loader_dlopen', '__dl__Z8__dlopenPKciPKv', '__dl_open'].includes(_.name))
                     .map(_ => ({ handle: _.address, readString: _ => _.readCString() }));
                 break;
-            case "darwin":
-                targets = [find("libdyld.dylib", "dlopen")];
+            case 'darwin':
+                targets = [find('libdyld.dylib', 'dlopen')];
                 break;
-            case "windows":
+            case 'windows':
                 targets = [
-                    find("kernel32.dll", "LoadLibraryW", _ => _.readUtf16String()),
-                    find("kernel32.dll", "LoadLibraryExW", _ => _.readUtf16String()),
-                    find("kernel32.dll", "LoadLibraryA", _ => _.readAnsiString()),
-                    find("kernel32.dll", "LoadLibraryExA", _ => _.readAnsiString())
+                    find('kernel32.dll', 'LoadLibraryW', _ => _.readUtf16String()),
+                    find('kernel32.dll', 'LoadLibraryExW', _ => _.readUtf16String()),
+                    find('kernel32.dll', 'LoadLibraryA', _ => _.readAnsiString()),
+                    find('kernel32.dll', 'LoadLibraryExA', _ => _.readAnsiString()),
                 ];
                 break;
         }
@@ -81,7 +82,7 @@ function forModule(...moduleNames: string[]): Promise<Module> {
         const interceptors = targets.map(_ =>
             Interceptor.attach(_!.handle, {
                 onEnter(args: InvocationArguments) {
-                    this.modulePath = _!.readString(args[0]) ?? "";
+                    this.modulePath = _!.readString(args[0]) ?? '';
                 },
                 onLeave(_: InvocationReturnValue) {
                     for (const moduleName of moduleNames) {
@@ -100,8 +101,8 @@ function forModule(...moduleNames: string[]): Promise<Module> {
                             }
                         }
                     }
-                }
-            })
+                },
+            }),
         );
     });
 }

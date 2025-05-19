@@ -1,27 +1,27 @@
-namespace Il2Cpp {
-    export class Parameter {
-        /** Name of this parameter. */
-        readonly name: string;
+import { FieldType } from './field';
+import { Reference } from './reference';
+import { Type as Il2CppType } from './type';
 
-        /** Position of this parameter. */
-        readonly position: number;
+export class Parameter {
+    /** Name of this parameter. */
+    readonly name: string;
 
-        /** Type of this parameter. */
-        readonly type: Il2Cpp.Type;
+    /** Position of this parameter. */
+    readonly position: number;
 
-        constructor(name: string, position: number, type: Il2Cpp.Type) {
-            this.name = name;
-            this.position = position;
-            this.type = type;
-        }
+    /** Type of this parameter. */
+    readonly type: Il2CppType;
 
-        /** */
-        toString(): string {
-            return `${this.type.name} ${this.name}`;
-        }
+    constructor(name: string, position: number, type: Il2CppType) {
+        this.name = name;
+        this.position = position;
+        this.type = type;
     }
 
-    export namespace Parameter {
-        export type Type = Il2Cpp.Field.Type | Il2Cpp.Reference;
+    /** */
+    toString(): string {
+        return `${this.type.name} ${this.name}`;
     }
 }
+
+export type ParameterType = FieldType | Reference;

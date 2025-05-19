@@ -1,5 +1,4 @@
-/** @internal */
-function readNativeIterator(block: (iteratorPointer: NativePointer) => NativePointer): NativePointer[] {
+export function readNativeIterator(block: (iteratorPointer: NativePointer) => NativePointer): NativePointer[] {
     const array = [];
     const iterator = Memory.alloc(Process.pointerSize);
 

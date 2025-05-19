@@ -1,8 +1,8 @@
 /** Scaffold class. */
-class NativeStruct implements ObjectWrapper {
+export class NativeStruct implements ObjectWrapper {
     readonly handle: NativePointer;
 
-    constructor(handleOrWrapper: NativePointerValue) {
+    constructor(handleOrWrapper: NativePointerValue | ObjectWrapper) {
         if (handleOrWrapper instanceof NativePointer) {
             this.handle = handleOrWrapper;
         } else {
@@ -10,7 +10,7 @@ class NativeStruct implements ObjectWrapper {
         }
     }
 
-    equals(other: NativeStruct) {
+    equals(other: NativeStruct): boolean {
         return this.handle.equals(other.handle);
     }
 
