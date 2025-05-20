@@ -27,6 +27,7 @@ import { ValueType } from './value-type';
 export class Object extends NativeStruct {
     /** Available in implementation block. */
     currentMethod?: Method;
+
     /** Gets the Il2CppObject struct size, possibly equal to `Process.pointerSize * 2`. */
     @lazy
     static get headerSize(): number {

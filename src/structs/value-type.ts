@@ -9,6 +9,7 @@ import { Type } from './type';
 export class ValueType extends NativeStruct {
     /** Available in implementation block. */
     currentMethod?: Method;
+
     constructor(handle: NativePointer, readonly type: Type) {
         super(handle);
     }
