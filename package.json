@@ -34,13 +34,21 @@
     "trailingComma": "none"
   },
   "devDependencies": {
-    "@types/frida-gum": "^18.4.3",
-    "ts-patch": "^3.0.2",
+    "@types/frida-gum": "^18.8.2",
+    "ts-patch": "^3.3.0",
     "ts-transformer-inline-file": "^0.2.0"
   },
   "overrides": {
     "ts-transformer-inline-file": {
       "typescript": "^5.0.0"
     }
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "^5.0.0"
+    }
+  },
+  "dependencies": {
+    "typescript": "^5.8.3"
   }
 }
