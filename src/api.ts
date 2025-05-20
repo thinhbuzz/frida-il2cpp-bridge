@@ -1,9 +1,6 @@
-import { $INLINE_FILE } from 'ts-transformer-inline-file';
 import { module } from './module';
 import { raise } from './utils/console';
 import { lazyValue } from './utils/lazy';
-
-export const memorySnapshotApi = lazyValue(() => new CModule($INLINE_FILE('cmodules/memory-snapshot.c')));
 
 /**
  * The **core** object where all the necessary IL2CPP native functions are
@@ -37,7 +34,7 @@ export function r<R extends NativeFunctionReturnType, A extends NativeFunctionAr
     retType: R,
     argTypes: A,
 ) {
-    const handle = (globalThis as any).IL2CPP_EXPORTS?.[exportName]?.() ?? module.value.findExportByName(exportName) ?? memorySnapshotApi.value[exportName];
+    const handle = module.value.findExportByName(exportName);
     return new NativeFunction(handle ?? raise(`couldn't resolve export ${exportName}`), retType, argTypes);
 }
 
