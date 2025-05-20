@@ -67,25 +67,21 @@ export class Thread extends NativeStruct {
     }
 
     @lazy
-    private get synchronizationContext(): Object {
-        const get_ExecutionContext = this.object.tryMethod<Object>('GetMutableExecutionContext') ?? this.object.method(
-            'get_ExecutionContext');
+    private get synchronizationContext(): Object | null {
+        const get_ExecutionContext = this.object.tryMethod<Object>('GetMutableExecutionContext') ?? this.object.method('get_ExecutionContext');
         const executionContext = get_ExecutionContext.invoke();
 
-        let synchronizationContext =
+        // From what I observed, only the main thread is supposed to have a
+        // synchronization context; however there are two cases where it is
+        // not available at all:
+        // 1) during early instrumentation;
+        // 2) it was dead code has it was stripped out.
+        const synchronizationContext =
             executionContext.tryField<Object>('_syncContext')?.value ??
             executionContext.tryMethod<Object>('get_SynchronizationContext')?.invoke() ??
             this.tryLocalValue(corlib.value.class('System.Threading.SynchronizationContext'));
 
-        if (synchronizationContext == null || synchronizationContext.isNull()) {
-            if (this.handle.equals(mainThread.value.handle)) {
-                raise(`couldn't find the synchronization context of the main thread, perhaps this is early instrumentation?`);
-            } else {
-                raise(`couldn't find the synchronization context of thread #${this.managedId}, only the main thread is expected to have one`);
-            }
-        }
-
-        return synchronizationContext;
+        return synchronizationContext?.asNullable() ?? null;
     }
 
     /** Detaches the thread from the application domain. */
@@ -94,8 +90,12 @@ export class Thread extends NativeStruct {
     }
 
     /** Schedules a callback on the current thread. */
-    schedule<T>(block: () => T | Promise<T>): Promise<T> {
-        const Post = this.synchronizationContext.method('Post');
+    schedule<T>(block: () => T): Promise<T> {
+        const Post = this.synchronizationContext?.tryMethod('Post');
+
+        if (Post == null) {
+            return Process.runOnThread(this.id, block);
+        }
         let sendOrPostCallback: Object | null = null;
 
         return new Promise(resolve => {
@@ -142,6 +142,33 @@ export class Thread extends NativeStruct {
 
 /** Gets the attached threads. */
 export const attachedThreads = lazyValue(() => {
+    if (threadGetAttachedThreads.value.isNull()) {
+        const currentThreadHandle = currentThread.value?.handle ?? raise('Current thread is not attached to IL2CPP');
+        const pattern = currentThreadHandle.toMatchPattern();
+
+        const threads: Thread[] = [];
+
+        for (const range of Process.enumerateRanges('rw-')) {
+            if (range.file == undefined) {
+                const matches = Memory.scanSync(range.base, range.size, pattern);
+                if (matches.length == 1) {
+                    while (true) {
+                        const handle = matches[0].address.sub(matches[0].size * threads.length).readPointer();
+
+                        if (handle.isNull() || !handle.readPointer().equals(currentThreadHandle.readPointer())) {
+                            break;
+                        }
+
+                        threads.unshift(new Thread(handle));
+                    }
+                    break;
+                }
+            }
+        }
+
+        return threads;
+    }
+
     return readNativeList(threadGetAttachedThreads.value).map(_ => new Thread(_));
 });
 

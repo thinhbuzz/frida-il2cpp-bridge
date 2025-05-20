@@ -43,27 +43,27 @@ export function reference<T extends FieldType>(value: T, type?: Type): Reference
         case 'boolean':
             return new Reference(handle.writeS8(+value), corlib.value.class('System.Boolean').type);
         case 'number':
-            switch (type?.typeEnum) {
-                case Type.enum.unsignedByte:
+            switch (type?.enumValue) {
+                case Type.Enum.UBYTE:
                     return new Reference<T>(handle.writeU8(value), type);
-                case Type.enum.byte:
+                case Type.Enum.BYTE:
                     return new Reference<T>(handle.writeS8(value), type);
-                case Type.enum.char:
-                case Type.enum.unsignedShort:
+                case Type.Enum.CHAR:
+                case Type.Enum.USHORT:
                     return new Reference<T>(handle.writeU16(value), type);
-                case Type.enum.short:
+                case Type.Enum.SHORT:
                     return new Reference<T>(handle.writeS16(value), type);
-                case Type.enum.unsignedInt:
+                case Type.Enum.UINT:
                     return new Reference<T>(handle.writeU32(value), type);
-                case Type.enum.int:
+                case Type.Enum.INT:
                     return new Reference<T>(handle.writeS32(value), type);
-                case Type.enum.unsignedLong:
+                case Type.Enum.ULONG:
                     return new Reference<T>(handle.writeU64(value), type);
-                case Type.enum.long:
+                case Type.Enum.LONG:
                     return new Reference<T>(handle.writeS64(value), type);
-                case Type.enum.float:
+                case Type.Enum.FLOAT:
                     return new Reference<T>(handle.writeFloat(value), type);
-                case Type.enum.double:
+                case Type.Enum.DOUBLE:
                     return new Reference<T>(handle.writeDouble(value), type);
             }
         case 'object':
@@ -74,9 +74,9 @@ export function reference<T extends FieldType>(value: T, type?: Type): Reference
             } else if (value instanceof String || value instanceof Array) {
                 return new Reference<T>(handle.writePointer(value), value.object.class.type);
             } else if (value instanceof NativePointer) {
-                switch (type?.typeEnum) {
-                    case Type.enum.unsignedNativePointer:
-                    case Type.enum.nativePointer:
+                switch (type?.enumValue) {
+                    case Type.Enum.NUINT:
+                    case Type.Enum.NINT:
                         return new Reference<T>(handle.writePointer(value), type);
                 }
             } else if (value instanceof Int64) {

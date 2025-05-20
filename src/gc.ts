@@ -93,7 +93,8 @@ export function choose(klass: Class): Object[] {
     const chooseCallback = new NativeCallback(callback, 'void', ['pointer', 'int', 'pointer']);
 
     if (unityVersionIsBelow202120) {
-        const onWorld = new NativeCallback(() => {}, 'void', []);
+        const onWorld = new NativeCallback(() => {
+        }, 'void', []);
         const state = livenessCalculationBegin.value(klass, 0, chooseCallback, NULL, onWorld, onWorld);
 
         livenessCalculationFromStatics.value(state);

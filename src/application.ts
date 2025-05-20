@@ -2,6 +2,7 @@ import { resolveInternalCall } from './api';
 import { module } from './module';
 import { String } from './structs/string';
 import { raise } from './utils/console';
+import { exportsHash } from './utils/hash';
 import { lazyValue } from './utils/lazy';
 import * as UnityVersion from './utils/unity-version';
 
@@ -27,17 +28,18 @@ export function getDataPath(): string | null {
  * Gets the identifier name of the current application, e.g.
  * `com.example.application` on Android.
  *
- * **This information is not guaranteed to exist.**
+ * In case the identifier cannot be retrieved, the main module name is
+ * returned instead, which typically is the process name.
  *
  * ```ts
  * perform(() => {
  *     // prints com.example.application
- *     console.log(getIdentifier());
+ *     console.log(application.identifier);
  * });
  * ```
  */
 export function getIdentifier(): string | null {
-    return unityEngineCall('get_identifier') ?? unityEngineCall('get_bundleIdentifier');
+    return unityEngineCall('get_identifier') ?? unityEngineCall('get_bundleIdentifier') ?? Process.mainModule.name;
 }
 
 /**
@@ -53,7 +55,7 @@ export function getIdentifier(): string | null {
  * ```
  */
 export function getVersion(): string | null {
-    return unityEngineCall('get_version');
+    return unityEngineCall('get_version') ?? exportsHash(module.value).toString(16);
 }
 
 /**
@@ -78,7 +80,7 @@ export function getVersion(): string | null {
  */
 export const unityVersion = lazyValue(() => {
     try {
-        const unityVersion = (globalThis as any).IL2CPP_UNITY_VERSION ?? unityEngineCall('get_unityVersion');
+        const unityVersion = unityEngineCall('get_unityVersion');
 
         if (unityVersion != null) {
             return unityVersion;

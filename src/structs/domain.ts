@@ -1,4 +1,4 @@
-import { domainGet, domainGetAssemblies, threadAttach, domainGetAssemblyFromName } from '../api';
+import { domainGet, domainGetAssemblies, domainGetAssemblyFromName, threadAttach } from '../api';
 import { raise } from '../utils/console';
 import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';

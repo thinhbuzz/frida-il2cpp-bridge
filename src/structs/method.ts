@@ -26,6 +26,7 @@ import { FieldType } from './field';
 import { corlib } from './image';
 import { Object } from './object';
 import { Parameter, ParameterType } from './parameter';
+import { Reference } from './reference';
 import { Type } from './type';
 import { ValueType } from './value-type';
 
@@ -229,12 +230,13 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
 
     /** Creates a generic instance of the current generic method. */
     inflate<R extends MethodReturnType = T>(...classes: Class[]): Method<R> {
-        if (!this.isGeneric) {
-            raise(`cannot inflate method ${this.name} as it has no generic parameters`);
-        }
-
-        if (this.generics.length != classes.length) {
-            raise(`cannot inflate method ${this.name} as it needs ${this.generics.length} generic parameter(s), not ${classes.length}`);
+        if (!this.isGeneric || this.generics.length != classes.length) {
+            for (const method of this.overloads()) {
+                if (method.isGeneric && method.generics.length == classes.length) {
+                    return method.inflate(...classes);
+                }
+            }
+            raise(`could not find inflatable signature of method ${this.name} with ${classes.length} generic parameter(s)`);
         }
 
         const types = classes.map(_ => _.type.object);
@@ -271,7 +273,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
                 raise('an unexpected native invocation exception occurred, this is due to parameter types mismatch');
             }
 
-            switch (e?.message) {
+            switch (e.message) {
                 case 'bad argument count':
                     raise(`couldn't invoke method ${this.name} as it needs ${this.parameterCount} parameter(s), not ${parameters.length}`);
                 case 'expected a pointer':
@@ -285,9 +287,21 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     }
 
     /** Gets the overloaded method with the given parameter types. */
-    overload(...parameterTypes: string[]): Method<T> {
-        return this.tryOverload(...parameterTypes) ?? raise(`couldn't find overload for method ${this.name} with parameter types ${parameterTypes.join(
-            ', ')}`);
+    overload(...typeNamesOrClasses: (string | Class)[]): Method<T> {
+        const method = this.tryOverload<T>(...typeNamesOrClasses);
+        return (
+            method ?? raise(`couldn't find overloaded method ${this.name}(${typeNamesOrClasses.map(_ => (_ instanceof Class ? _.type.name : _))})`)
+        );
+    }
+
+    * overloads(): Generator<Method> {
+        for (const klass of this.class.hierarchy()) {
+            for (const method of klass.methods) {
+                if (this.name == method.name) {
+                    yield method;
+                }
+            }
+        }
     }
 
     /** Gets the parameter with the given name. */
@@ -302,22 +316,73 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     }
 
     /** Gets the overloaded method with the given parameter types. */
-    tryOverload<U extends MethodReturnType = T>(...parameterTypes: string[]): Method<U> | undefined {
-        let klass: Class | null = this.class;
-        while (klass) {
-            const method = klass.methods.find(method => {
-                return (
-                    method.name == this.name &&
-                    method.parameterCount == parameterTypes.length &&
-                    method.parameters.every((e, i) => e.type.name == parameterTypes[i])
-                );
-            }) as Method<U> | undefined;
-            if (method) {
-                return method;
+    tryOverload<U extends MethodReturnType = T>(...typeNamesOrClasses: (string | Class)[]): Method<U> | undefined {
+        const minScore = typeNamesOrClasses.length * 1;
+        const maxScore = typeNamesOrClasses.length * 2;
+
+        let candidate: [number, Method] | undefined = undefined;
+
+        loop: for (const method of this.overloads()) {
+            if (method.parameterCount != typeNamesOrClasses.length) continue;
+
+            let score = 0;
+            let i = 0;
+            for (const parameter of method.parameters) {
+                const desiredTypeNameOrClass = typeNamesOrClasses[i];
+                if (desiredTypeNameOrClass instanceof Class) {
+                    if (parameter.type.is(desiredTypeNameOrClass.type)) {
+                        score += 2;
+                    } else if (parameter.type.class.isAssignableFrom(desiredTypeNameOrClass)) {
+                        score += 1;
+                    } else {
+                        continue loop;
+                    }
+                } else if (parameter.type.name == desiredTypeNameOrClass) {
+                    score += 2;
+                } else {
+                    continue loop;
+                }
+                i++;
             }
-            klass = klass.parent;
+
+            if (score < minScore) {
+
+            } else if (score == maxScore) {
+                return method as Method<U>;
+            } else if (candidate == undefined || score > candidate[0]) {
+                candidate = [score, method];
+            } else if (score == candidate[0]) {
+                // ```cs
+                // class Parent {}
+                // class Child0 extends Parent {}
+                // class Child1 extends Parent {}
+                // class Child11 extends Child1 {}
+                //
+                // class Methods {
+                //   void Foo(obj: Parent) {}
+                //   void Foo(obj: Child1) {}
+                //}
+                // ```
+                // in this scenario, Foo(Parent) and Foo(Child1) have
+                // the same score when looking for Foo(Child11) -
+                // we must compare the two candidates to determine the
+                // one that is "closer" to Foo(Child11)
+                let i = 0;
+                for (const parameter of candidate[1].parameters) {
+                    // in this case, Foo(Parent) is the candidate
+                    // overload: let's compare the parameter types - if
+                    // any of the candidate ones is a parent, then the
+                    // candidate method is not the closest overload
+                    if (parameter.type.class.isAssignableFrom(method.parameters[i].type.class)) {
+                        candidate = [score, method];
+                        continue loop;
+                    }
+                    i++;
+                }
+            }
         }
-        return undefined;
+
+        return candidate?.[1] as Method<U> | undefined;
     }
 
     /** Gets the parameter with the given name. */
@@ -331,17 +396,18 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
 ${this.isStatic ? `static ` : ``}\
 ${this.returnType.name} \
 ${this.name}\
+${this.generics.length > 0 ? `<${this.generics.map(_ => _.type.name).join(',')}>` : ''}\
 (${this.parameters.join(`, `)});\
 ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toString(16).padStart(8, `0`)}`}`;
     }
 
-    withHolder(instance: Object | ValueType): Method<T> {
+    bind(instance: Object | ValueType): BoundMethod<T> {
         if (this.isStatic) {
-            raise(`cannot access static method ${this.class.type.name}::${this.name} from an object, use a class instead`);
+            raise(`cannot bind static method ${this.class.type.name}::${this.name} to an instance`);
         }
 
         return new Proxy(this, {
-            get(target: Method<T>, property: keyof Method<T>): any {
+            get(target: Method<T>, property: keyof Method<T>, receiver: Method<T>): any {
                 switch (property) {
                     case 'invoke':
                         // In Unity 5.3.5f1 and >= 2021.2.0f1, value types
@@ -356,18 +422,27 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                         const handle =
                             instance instanceof ValueType
                                 ? target.class.isValueType
-                                    ? instance.handle.add(maybeObjectHeaderSize.value - Object.headerSize)
+                                    ? instance.handle.sub(structMethodsRequireObjectInstances.value ? Object.headerSize : 0)
                                     : raise(`cannot invoke method ${target.class.type.name}::${target.name} against a value type, you must box it first`)
                                 : target.class.isValueType
-                                    ? instance.handle.add(maybeObjectHeaderSize.value)
+                                    ? instance.handle.add(structMethodsRequireObjectInstances.value ? 0 : Object.headerSize)
                                     : instance.handle;
 
                         return target.invokeRaw.bind(target, handle);
+                    case 'overloads':
+                        return function* () {
+                            for (const method of target[property]()) {
+                                if (!method.isStatic) {
+                                    yield method;
+                                }
+                            }
+                        };
                     case 'inflate':
                     case 'overload':
                     case 'tryOverload':
+                        const member = Reflect.get(target, property).bind(receiver);
                         return function (...args: any[]) {
-                            return target[property](...args)?.withHolder(instance);
+                            return member(...args)?.bind(instance);
                         };
                 }
 
@@ -384,11 +459,12 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                     ? this.class
                     : this.class.isValueType
                         ? new ValueType(
-                            (args[0] as NativePointer).add(Object.headerSize - maybeObjectHeaderSize.value),
+                            (args[0] as NativePointer).add(structMethodsRequireObjectInstances.value ? Object.headerSize : 0),
                             this.class.type,
                         )
                         : new Object(args[0] as NativePointer);
-                thisObject.currentMethod = this.isStatic ? this : this.withHolder(thisObject as (Object | ValueType));
+
+                thisObject.currentMethod = this.isStatic ? this : this.bind(thisObject as (Object | ValueType));
                 const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
                 const result = block.call(thisObject, ...parameters);
                 return toFridaValue(result);
@@ -399,18 +475,44 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
     }
 }
 
-export const maybeObjectHeaderSize = lazyValue((): number => {
-    const struct = corlib.value.class('System.RuntimeTypeHandle').initialize().alloc();
-    struct.method('.ctor').invokeRaw(struct, ptr(0xdeadbeef));
+/**
+ * A {@link Method} bound to a {@link Object} or a
+ * {@link ValueType} (also known as *instances*). \
+ * Invoking bound methods will pass the assigned instance as `this`.
+ * ```ts
+ * const object: Object = string("Hello, world!").object;
+ * const GetLength: BoundMethod<number> = object.method<number>("GetLength");
+ * // There is no need to pass the object when invoking GetLength!
+ * const length = GetLength.invoke(); // 13
+ * ```
+ * Of course, binding a static method does not make sense and may cause
+ * unwanted behaviors. \
+ *
+ * Binding can be done manually with:
+ * ```ts
+ * const SystemString = corlib.class("System.String");
+ * const GetLength: Method<number> = SystemString.method<number>("GetLength");
+ *
+ * const object: Object = string("Hello, world!").object;
+ * // ＠ts-ignore
+ * const GetLengthBound: BoundMethod<number> = GetLength.bind(object);
+ * ```
+ */
+export interface BoundMethod<T extends MethodReturnType = MethodReturnType> extends Method<T> {
+}
+
+export const structMethodsRequireObjectInstances = lazyValue((): boolean => {
+    const object = corlib.value.class('System.Int64').alloc();
+    object.field('m_value').value = 0xdeadbeef;
 
     // Here we check where the sentinel value is
     // if it's not where it is supposed to be, it means struct methods
     // assume they are receiving value types (that is a pointer to raw data)
     // hence, we must "skip" the object header when invoking such methods.
-    return struct.field<NativePointer>('value').value.equals(ptr(0xdeadbeef)) ? 0 : Object.headerSize;
+    return object.method<boolean>('Equals', 1).overload(object.class).invokeRaw(object, 0xdeadbeef);
 });
 
-export type MethodReturnType = void | FieldType;
+export type MethodReturnType = void | FieldType | Reference;
 
 export const enum MethodAttributes {
     MemberAccessMask = 0x0007,

@@ -2,7 +2,7 @@
 export class NativeStruct implements ObjectWrapper {
     readonly handle: NativePointer;
 
-    constructor(handleOrWrapper: NativePointerValue | ObjectWrapper) {
+    constructor(handleOrWrapper: NativePointerValue) {
         if (handleOrWrapper instanceof NativePointer) {
             this.handle = handleOrWrapper;
         } else {
@@ -10,7 +10,7 @@ export class NativeStruct implements ObjectWrapper {
         }
     }
 
-    equals(other: NativeStruct): boolean {
+    equals(other: NativeStruct) {
         return this.handle.equals(other.handle);
     }
 

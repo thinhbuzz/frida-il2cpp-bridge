@@ -1,6 +1,5 @@
 import { assemblyGetImage } from '../api';
 import { raise } from '../utils/console';
-import { getter } from '../utils/getter';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
@@ -13,39 +12,31 @@ import { string } from './string';
 @recycle
 export class Assembly extends NativeStruct {
     /** Gets the image of this assembly. */
-    @lazy
     get image(): Image {
-        let get = function (this: Assembly) {
-            return new Image(assemblyGetImage.value(this));
-        };
+        if (assemblyGetImage.value.isNull()) {
+            // We need to get the System.Reflection.Module of the current assembly;
+            // System.Reflection.Assembly::GetModulesInternal, for some reason,
+            // throws a NullReferenceExceptionin Unity 5.3.8f1, so we must rely on
+            // System.Type::get_Module instead.
+            // Now we need to get any System.Type of this assembly.
+            // We cannot use System.Reflection.Assembly::GetTypes because it may
+            // return an empty array; hence we use System.Reflection.Assembly::GetType
+            // to retrieve <Module>, a class/type that seems to be always present
+            // (despite being excluded from System.Reflection.Assembly::GetTypes).
+            const runtimeModule =
+                this.object
+                    .tryMethod<Object>('GetType', 1)
+                    ?.invoke(string('<Module>'))
+                    ?.asNullable()
+                    ?.tryMethod<Object>('get_Module')
+                    ?.invoke() ??
+                this.object.tryMethod<Array<Object>>('GetModules', 1)?.invoke(false)?.get(0) ??
+                raise(`couldn't find the runtime module object of assembly ${this.name}`);
 
-        try {
-            assemblyGetImage.value;
-        } catch (_) {
-            get = function (this: Assembly) {
-                // We need to get the System.Reflection.Module of the current assembly;
-                // System.Reflection.Assembly::GetModulesInternal, for some reason,
-                // throws a NullReferenceExceptionin Unity 5.3.8f1, so we must rely on
-                // System.Type::get_Module instead.
-                // Now we need to get any System.Type of this assembly.
-                // We cannot use System.Reflection.Assembly::GetTypes because it may
-                // return an empty array; hence we use System.Reflection.Assembly::GetType
-                // to retrieve <Module>, a class/type that seems to be always present
-                // (despite being excluded from System.Reflection.Assembly::GetTypes).
-                return new Image(
-                    this.object
-                        .method<Object>('GetType', 1)
-                        .invoke(string('<Module>'))
-                        .method<Object>('get_Module')
-                        .invoke()
-                        .field<NativePointer>('_impl').value,
-                );
-            };
+            return new Image(runtimeModule.field<NativePointer>('_impl').value);
         }
 
-        getter(Assembly.prototype, 'image', get, lazy);
-
-        return this.image;
+        return new Image(assemblyGetImage.value(this));
     }
 
     /** Gets the name of this assembly. */

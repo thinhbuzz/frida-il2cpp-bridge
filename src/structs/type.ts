@@ -1,4 +1,4 @@
-import { classGetArrayClass, free, typeGetClass, typeGetName, typeGetObject, typeGetTypeEnum } from '../api';
+import { classGetArrayClass, free, typeEquals, typeGetClass, typeGetName, typeGetObject, typeGetTypeEnum } from '../api';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
@@ -10,33 +10,33 @@ import { Object } from './object';
 export class Type extends NativeStruct {
     /** */
     @lazy
-    static get enum() {
-        const _ = (_: string, block = (_: Class): { type: Type } => _) => block(corlib.value.class(_)).type.typeEnum;
+    static get Enum() {
+        const _ = (_: string, block = (_: Class): { type: Type } => _) => block(corlib.value.class(_)).type.enumValue;
 
         return {
-            void: _('System.Void'),
-            boolean: _('System.Boolean'),
-            char: _('System.Char'),
-            byte: _('System.SByte'),
-            unsignedByte: _('System.Byte'),
-            short: _('System.Int16'),
-            unsignedShort: _('System.UInt16'),
-            int: _('System.Int32'),
-            unsignedInt: _('System.UInt32'),
-            long: _('System.Int64'),
-            unsignedLong: _('System.UInt64'),
-            nativePointer: _('System.IntPtr'),
-            unsignedNativePointer: _('System.UIntPtr'),
-            float: _('System.Single'),
-            double: _('System.Double'),
-            pointer: _('System.IntPtr', _ => _.field('m_value')),
-            valueType: _('System.Decimal'),
-            object: _('System.Object'),
-            string: _('System.String'),
-            class: _('System.Array'),
-            array: _('System.Void', _ => _.arrayClass),
-            multidimensionalArray: _('System.Void', _ => new Class(classGetArrayClass.value(_, 2))),
-            genericInstance: _('System.Int32', _ => _.interfaces.find(_ => _.name.endsWith('`1'))!),
+            VOID: _('System.Void'),
+            BOOLEAN: _('System.Boolean'),
+            CHAR: _('System.Char'),
+            BYTE: _('System.SByte'),
+            UBYTE: _('System.Byte'),
+            SHORT: _('System.Int16'),
+            USHORT: _('System.UInt16'),
+            INT: _('System.Int32'),
+            UINT: _('System.UInt32'),
+            LONG: _('System.Int64'),
+            ULONG: _('System.UInt64'),
+            NINT: _('System.IntPtr'),
+            NUINT: _('System.UIntPtr'),
+            FLOAT: _('System.Single'),
+            DOUBLE: _('System.Double'),
+            POINTER: _('System.IntPtr', _ => _.field('m_value')),
+            VALUE_TYPE: _('System.Decimal'),
+            OBJECT: _('System.Object'),
+            STRING: _('System.String'),
+            CLASS: _('System.Array'),
+            ARRAY: _('System.Void', _ => _.arrayClass),
+            NARRAY: _('System.Void', _ => new Class(classGetArrayClass.value(_, 2))),
+            GENERIC_INSTANCE: _('System.Int32', _ => _.interfaces.find(_ => _.name.endsWith('`1'))!),
         };
     }
 
@@ -58,45 +58,45 @@ export class Type extends NativeStruct {
             return 'pointer';
         }
 
-        switch (this.typeEnum) {
-            case Type.enum.void:
+        switch (this.enumValue) {
+            case Type.Enum.VOID:
                 return 'void';
-            case Type.enum.boolean:
+            case Type.Enum.BOOLEAN:
                 return 'bool';
-            case Type.enum.char:
+            case Type.Enum.CHAR:
                 return 'uchar';
-            case Type.enum.byte:
+            case Type.Enum.BYTE:
                 return 'int8';
-            case Type.enum.unsignedByte:
+            case Type.Enum.UBYTE:
                 return 'uint8';
-            case Type.enum.short:
+            case Type.Enum.SHORT:
                 return 'int16';
-            case Type.enum.unsignedShort:
+            case Type.Enum.USHORT:
                 return 'uint16';
-            case Type.enum.int:
+            case Type.Enum.INT:
                 return 'int32';
-            case Type.enum.unsignedInt:
+            case Type.Enum.UINT:
                 return 'uint32';
-            case Type.enum.long:
+            case Type.Enum.LONG:
                 return 'int64';
-            case Type.enum.unsignedLong:
+            case Type.Enum.ULONG:
                 return 'uint64';
-            case Type.enum.float:
+            case Type.Enum.FLOAT:
                 return 'float';
-            case Type.enum.double:
+            case Type.Enum.DOUBLE:
                 return 'double';
-            case Type.enum.nativePointer:
-            case Type.enum.unsignedNativePointer:
-            case Type.enum.pointer:
-            case Type.enum.string:
-            case Type.enum.array:
-            case Type.enum.multidimensionalArray:
+            case Type.Enum.NINT:
+            case Type.Enum.NUINT:
+            case Type.Enum.POINTER:
+            case Type.Enum.STRING:
+            case Type.Enum.ARRAY:
+            case Type.Enum.NARRAY:
                 return 'pointer';
-            case Type.enum.valueType:
+            case Type.Enum.VALUE_TYPE:
                 return this.class.isEnum ? this.class.baseType!.fridaAlias : getValueTypeFields(this);
-            case Type.enum.class:
-            case Type.enum.object:
-            case Type.enum.genericInstance:
+            case Type.Enum.CLASS:
+            case Type.Enum.OBJECT:
+            case Type.Enum.GENERIC_INSTANCE:
                 return this.class.isStruct ? getValueTypeFields(this) : this.class.isEnum ? this.class.baseType!.fridaAlias : 'pointer';
             default:
                 return 'pointer';
@@ -112,21 +112,21 @@ export class Type extends NativeStruct {
     /** Determines whether this type is primitive. */
     @lazy
     get isPrimitive(): boolean {
-        switch (this.typeEnum) {
-            case Type.enum.boolean:
-            case Type.enum.char:
-            case Type.enum.byte:
-            case Type.enum.unsignedByte:
-            case Type.enum.short:
-            case Type.enum.unsignedShort:
-            case Type.enum.int:
-            case Type.enum.unsignedInt:
-            case Type.enum.long:
-            case Type.enum.unsignedLong:
-            case Type.enum.float:
-            case Type.enum.double:
-            case Type.enum.nativePointer:
-            case Type.enum.unsignedNativePointer:
+        switch (this.enumValue) {
+            case Type.Enum.BOOLEAN:
+            case Type.Enum.CHAR:
+            case Type.Enum.BYTE:
+            case Type.Enum.UBYTE:
+            case Type.Enum.SHORT:
+            case Type.Enum.USHORT:
+            case Type.Enum.INT:
+            case Type.Enum.UINT:
+            case Type.Enum.LONG:
+            case Type.Enum.ULONG:
+            case Type.Enum.FLOAT:
+            case Type.Enum.DOUBLE:
+            case Type.Enum.NINT:
+            case Type.Enum.NUINT:
                 return true;
             default:
                 return false;
@@ -153,8 +153,16 @@ export class Type extends NativeStruct {
 
     /** Gets the type enum of the current type. */
     @lazy
-    get typeEnum(): number {
+    get enumValue(): number {
         return typeGetTypeEnum.value(this);
+    }
+
+    is(other: Type): boolean {
+        if (typeEquals.value.isNull()) {
+            return this.object.method<boolean>('Equals').invoke(other.object);
+        }
+
+        return !!typeEquals.value(this, other);
     }
 
     /** */

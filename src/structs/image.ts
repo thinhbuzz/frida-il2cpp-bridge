@@ -1,12 +1,4 @@
-import {
-    classFromName,
-    classFromObject,
-    getCorlib,
-    imageGetAssembly,
-    imageGetClass,
-    imageGetClassCount,
-    imageGetName,
-} from '../api';
+import { classFromName, classFromObject, getCorlib, imageGetAssembly, imageGetClass, imageGetClassCount, imageGetName } from '../api';
 import { unityVersionIsBelow201830 } from '../application';
 import { raise } from '../utils/console';
 import { lazy, lazyValue } from '../utils/lazy';
@@ -44,13 +36,17 @@ export class Image extends NativeStruct {
             // without iterating all the classes first somehow blows things up at
             // app startup, hence the `Array.from`.
             const classes = globalThis.Array.from(types, _ => new Class(classFromObject.value(_)));
-            classes.unshift(this.class('<Module>'));
+
+            // <Module> class does not always exist
+            // https://github.com/vfsfitvnm/frida-il2cpp-bridge/issues/627
+            const Module = this.tryClass('<Module>');
+            if (Module) {
+                classes.unshift(Module);
+            }
+
             return classes;
         } else {
-            return globalThis.Array.from(
-                globalThis.Array(this.classCount),
-                (_, i) => new Class(imageGetClass.value(this, i)),
-            );
+            return globalThis.Array.from(globalThis.Array(this.classCount), (_, i) => new Class(imageGetClass.value(this, i)));
         }
     }
 

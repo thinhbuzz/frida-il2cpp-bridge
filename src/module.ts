@@ -1,8 +1,7 @@
 import { getCorlib, initialize as il2cppInitialize } from './api';
 import { apiLevel } from './utils/android';
-import { raise } from './utils/console';
+import { raise, warn } from './utils/console';
 import { lazyValue } from './utils/lazy';
-import { forModule } from './utils/native-wait';
 
 /**
  * Gets the IL2CPP module (a *native library*), that is where the IL2CPP
@@ -29,18 +28,30 @@ import { forModule } from './utils/native-wait';
  * ```
  */
 export const module = lazyValue(() => {
-    const [moduleName, fallback] = getExpectedModuleNames();
-    return Process.findModuleByName(moduleName) ?? Process.getModuleByName(fallback);
+    return tryModule() ?? raise('Could not find IL2CPP module');
 });
 
 /**
  * Waits for the IL2CPP native library to be loaded and initialized.
  */
 export async function initialize(blocking = false): Promise<boolean> {
-    module.value = Process.platform == 'darwin'
-        ? Process.findModuleByAddress(DebugSymbol.fromName('il2cpp_init').address)
-        ?? await forModule(...getExpectedModuleNames())
-        : await forModule(...getExpectedModuleNames());
+    module.value = tryModule() ?? (await new Promise<Module>(resolve => {
+        const [moduleName, fallbackModuleName] = getExpectedModuleNames();
+
+        const timeout = setTimeout(() => {
+            warn(`after 10 seconds, IL2CPP module '${moduleName}' has not been loaded yet, is the app running?`);
+        }, 10000);
+
+        const moduleObserver = Process.attachModuleObserver({
+            onAdded(module: Module) {
+                if (module.name == moduleName || (fallbackModuleName && module.name == fallbackModuleName)) {
+                    resolve(module);
+                    clearTimeout(timeout);
+                    setImmediate(() => moduleObserver.detach());
+                }
+            },
+        });
+    }));
 
     // At this point, the IL2CPP native library has been loaded, but we
     // cannot interact with IL2CPP until `il2cpp_init` is done.
@@ -58,6 +69,16 @@ export async function initialize(blocking = false): Promise<boolean> {
     }
 
     return false;
+}
+
+export function tryModule(): Module | undefined {
+    const [moduleName, fallback] = getExpectedModuleNames();
+    return (
+        Process.findModuleByName(moduleName) ??
+        Process.findModuleByName(fallback ?? moduleName) ??
+        Process.findModuleByAddress(DebugSymbol.fromName('il2cpp_init').address) ??
+        undefined
+    );
 }
 
 export function getExpectedModuleNames(): string[] {

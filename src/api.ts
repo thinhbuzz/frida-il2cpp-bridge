@@ -3,7 +3,7 @@ import { module } from './module';
 import { raise } from './utils/console';
 import { lazyValue } from './utils/lazy';
 
-export const memorySnapshotApi = lazyValue(() => new CModule($INLINE_FILE('cmodules/memory-snapshot.c')));
+export const memorySnapshotExports = lazyValue(() => new CModule($INLINE_FILE('cmodules/memory-snapshot.c')));
 
 /**
  * The **core** object where all the necessary IL2CPP native functions are
@@ -37,7 +37,7 @@ export function r<R extends NativeFunctionReturnType, A extends NativeFunctionAr
     retType: R,
     argTypes: A,
 ) {
-    const handle = (globalThis as any).IL2CPP_EXPORTS?.[exportName]?.() ?? module.value.findExportByName(exportName) ?? memorySnapshotApi.value[exportName];
+    const handle = (globalThis as any).IL2CPP_EXPORTS?.[exportName]?.() ?? module.value.findExportByName(exportName) ?? memorySnapshotExports.value[exportName];
     return new NativeFunction(handle ?? raise(`couldn't resolve export ${exportName}`), retType, argTypes);
 }
 
@@ -328,6 +328,8 @@ export const threadGetAttachedThreads = lazyNativeValue(
 export const threadGetCurrent = lazyNativeValue('il2cpp_thread_current', 'pointer', []);
 
 export const threadIsVm = lazyNativeValue('il2cpp_is_vm_thread', 'bool', ['pointer']);
+
+export const typeEquals = lazyNativeValue('il2cpp_type_equals', 'bool', ['pointer', 'pointer']);
 
 export const typeGetClass = lazyNativeValue('il2cpp_class_from_type', 'pointer', ['pointer']);
 

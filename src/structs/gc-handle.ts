@@ -1,4 +1,4 @@
-import { gcHandleGetTarget, gcHandleFree } from '../api';
+import { gcHandleFree, gcHandleGetTarget } from '../api';
 import { Object } from './object';
 
 export class GCHandle {

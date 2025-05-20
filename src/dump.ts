@@ -1,6 +1,8 @@
 import { getDataPath, getIdentifier, getVersion } from './application';
 import { domain } from './structs/domain';
-import { inform, ok } from './utils/console';
+import { corlib } from './structs/image';
+import { string } from './structs/string';
+import { inform, ok, raise } from './utils/console';
 
 /**
  * Dumps the application, i.e. it creates a dummy `.cs` file that contains
@@ -18,7 +20,7 @@ import { inform, ok } from './utils/console';
  *
  * Dumping *may* require a file name and a directory path (a place where the
  * application can write to). If not provided, the target path is generated
- * automatically using the information from.
+ * automatically using the information from {@link application}.
  *
  * ```ts
  * perform(() => {
@@ -45,9 +47,12 @@ import { inform, ok } from './utils/console';
  * ```
  */
 export function dump(fileName?: string, path?: string): void {
-    fileName = fileName ?? `${getIdentifier() ?? 'unknown'}_${getVersion() ?? 'unknown'}.cs`;
+    fileName = fileName ?? `${getIdentifier()}_${getVersion()}.cs`;
+    path = path ?? getDataPath() ?? Process.getCurrentDir();
 
-    const destination = `${path ?? getDataPath()}/${fileName}`;
+    createDirectoryRecursively(path);
+
+    const destination = `${path}/${fileName}`;
     const file = new File(destination, 'w');
 
     for (const assembly of domain.value.assemblies) {
@@ -61,4 +66,53 @@ export function dump(fileName?: string, path?: string): void {
     file.flush();
     file.close();
     ok(`dump saved to ${destination}`);
+}
+
+/**
+ * @deprecated
+ * Just like {@link dump}, but a `.cs` file per assembly is
+ * generated instead of having a single big `.cs` file. For instance, all
+ * classes within `System.Core` and `System.Runtime.CompilerServices.Unsafe`
+ * are dumped into `System/Core.cs` and
+ * `System/Runtime/CompilerServices/Unsafe.cs`, respectively.
+ *
+ * ```ts
+ * perform(() => {
+ *     dumpTree();
+ * });
+ * ```
+ */
+export function dumpTree(path?: string, ignoreAlreadyExistingDirectory: boolean = false): void {
+    path = path ?? `${getDataPath() ?? Process.getCurrentDir()}/${getIdentifier()}_${getVersion()}`;
+
+    if (!ignoreAlreadyExistingDirectory && directoryExists(path)) {
+        raise(`directory ${path} already exists - pass ignoreAlreadyExistingDirectory = true to skip this check`);
+    }
+
+    for (const assembly of domain.value.assemblies) {
+        inform(`dumping ${assembly.name}...`);
+
+        const destination = `${path}/${assembly.name.replace(/\./g, '/')}.cs`;
+
+        createDirectoryRecursively(destination.substring(0, destination.lastIndexOf('/')));
+
+        const file = new File(destination, 'w');
+
+        for (const klass of assembly.image.classes) {
+            file.write(`${klass}\n\n`);
+        }
+
+        file.flush();
+        file.close();
+    }
+
+    ok(`dump saved to ${path}`);
+}
+
+function directoryExists(path: string): boolean {
+    return corlib.value.class('System.IO.Directory').method<boolean>('Exists').invoke(string(path));
+}
+
+function createDirectoryRecursively(path: string) {
+    corlib.value.class('System.IO.Directory').method('CreateDirectory').invoke(string(path));
 }

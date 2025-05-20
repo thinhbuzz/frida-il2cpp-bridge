@@ -1,12 +1,4 @@
-import {
-    fieldGetClass,
-    fieldGetFlags,
-    fieldGetName,
-    fieldGetOffset,
-    fieldGetStaticValue,
-    fieldGetType,
-    fieldSetStaticValue,
-} from '../api';
+import { fieldGetClass, fieldGetFlags, fieldGetName, fieldGetOffset, fieldGetStaticValue, fieldGetType, fieldSetStaticValue } from '../api';
 import { read, write } from '../memory';
 import { raise } from '../utils/console';
 import { getter } from '../utils/getter';
@@ -139,31 +131,28 @@ ${this.isThreadStatic ? `[ThreadStatic] ` : ``}\
 ${this.isStatic ? `static ` : ``}\
 ${this.type.name} \
 ${this.name}\
-${this.isLiteral ? ` = ${this.type.class.isEnum ? read(
-            (this.value as ValueType).handle,
-            this.type.class.baseType!,
-        ) : this.value}` : ``};\
+${this.isLiteral ? ` = ${this.type.class.isEnum ? read((this.value as ValueType).handle, this.type.class.baseType!) : this.value}` : ``};\
 ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)}`}`;
     }
 
-    withHolder(instance: Object | ValueType): Field<T> {
+    bind(instance: Object | ValueType): BoundField<T> {
         if (this.isStatic) {
-            raise(`cannot access static field ${this.class.type.name}::${this.name} from an object, use a class instead`);
+            raise(`cannot bind static field ${this.class.type.name}::${this.name} to an instance`);
         }
 
-        const valueHandle = instance.handle.add(this.offset - (instance instanceof ValueType ? Object.headerSize : 0));
+        const offset = this.offset - (instance instanceof ValueType ? Object.headerSize : 0);
 
         return new Proxy(this, {
             get(target: Field<T>, property: keyof Field): any {
                 if (property == 'value') {
-                    return read(valueHandle, target.type);
+                    return read(instance.handle.add(offset), target.type);
                 }
                 return Reflect.get(target, property);
             },
 
             set(target: Field<T>, property: keyof Field, value: any): boolean {
                 if (property == 'value') {
-                    write(valueHandle, value, target.type);
+                    write(instance.handle.add(offset), value, target.type);
                     return true;
                 }
 
@@ -171,6 +160,30 @@ ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)
             },
         });
     }
+}
+
+/**
+ * A {@link Field} bound to a {@link Object} or a
+ * {@link ValueType} (also known as *instances*).
+ * ```ts
+ * const object: Object = string("Hello, world!").object;
+ * const m_length: BoundField<number> = object.field<number>("m_length");
+ * const length = m_length.value; // 13
+ * ```
+ * Of course, binding a static field does not make sense and may cause
+ * unwanted behaviors.
+ *
+ * Binding can be done manually with:
+ * ```ts
+ * const SystemString = corlib.class("System.String");
+ * const m_length: Field<number> = SystemString.field<number>("m_length");
+ *
+ * const object: Object = string("Hello, world!").object;
+ * // ＠ts-ignore
+ * const m_length_bound: BoundField<number> = m_length.bind(object);
+ * ```
+ */
+export interface BoundField<T extends FieldType = FieldType> extends Field<T> {
 }
 
 export type FieldType =
