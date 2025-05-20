@@ -388,7 +388,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                             this.class.type,
                         )
                         : new Object(args[0] as NativePointer);
-
+                thisObject.currentMethod = this.isStatic ? this : this.withHolder(thisObject as (Object | ValueType));
                 const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
                 const result = block.call(thisObject, ...parameters);
                 return toFridaValue(result);

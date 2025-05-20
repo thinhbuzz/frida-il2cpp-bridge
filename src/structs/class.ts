@@ -52,6 +52,9 @@ import { Type } from './type';
 
 @recycle
 export class Class extends NativeStruct {
+    /** Available in implementation block. */
+    currentMethod?: Method;
+
     /** Gets the actual size of the instance of the current class. */
     get actualInstanceSize(): number {
         const SystemString = corlib.value.class('System.String');
