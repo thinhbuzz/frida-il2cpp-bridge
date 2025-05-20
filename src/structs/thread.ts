@@ -6,7 +6,7 @@ import { NativeStruct } from '../utils/native-struct';
 import { offsetOf } from '../utils/offset-of';
 import { readNativeList } from '../utils/read-native-list';
 import { Class } from './class';
-import { delegate } from './delegate';
+import { cleanupDelegates, delegate } from './delegate';
 import { corlib } from './image';
 import { Object } from './object';
 
@@ -96,9 +96,10 @@ export class Thread extends NativeStruct {
     /** Schedules a callback on the current thread. */
     schedule<T>(block: () => T | Promise<T>): Promise<T> {
         const Post = this.synchronizationContext.method('Post');
+        let sendOrPostCallback: Object | null = null;
 
         return new Promise(resolve => {
-            const sendOrPostCallback = delegate(corlib.value.class('System.Threading.SendOrPostCallback'), () => {
+            sendOrPostCallback = delegate(corlib.value.class('System.Threading.SendOrPostCallback'), () => {
                 const result = block();
                 setImmediate(() => resolve(result));
             });
@@ -118,11 +119,12 @@ export class Thread extends NativeStruct {
             // The following solution, which basically redirects the invocation to a native function that
             // survives the script reloading, is much simpler, honestly.
             Script.bindWeak(globalThis, () => {
-                sendOrPostCallback.field('method_ptr').value = sendOrPostCallback.field('invoke_impl').value = domainGet.value;
+                sendOrPostCallback!.field('method_ptr').value = sendOrPostCallback!.field('invoke_impl').value = domainGet.value;
             });
 
             Post.invoke(sendOrPostCallback, NULL);
-        });
+        })
+            .finally(() => cleanupDelegates(sendOrPostCallback)) as Promise<T>;
     }
 
     tryLocalValue(klass: Class): Object | undefined {

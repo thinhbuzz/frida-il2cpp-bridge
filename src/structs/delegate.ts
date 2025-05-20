@@ -38,3 +38,11 @@ export function delegate<P extends ParameterType[], R extends MethodReturnType>(
 
 /** Used to prevent eager garbage collection against NativeCallbacks. */
 export const _callbacksToKeepAlive: Record<string, NativeCallback<'void', []> | undefined> = {};
+
+export function cleanupDelegates(...delegates: (ObjectWrapper | null | undefined)[]) {
+    for (let delegate of delegates) {
+        if (delegate) {
+            delete _callbacksToKeepAlive[delegate.handle.toString()];
+        }
+    }
+}
