@@ -90,11 +90,11 @@ export class Thread extends NativeStruct {
     }
 
     /** Schedules a callback on the current thread. */
-    schedule<T>(block: () => T): Promise<T> {
+    schedule<T>(block: () => T | Promise<T>): Promise<T> {
         const Post = this.synchronizationContext?.tryMethod('Post');
 
         if (Post == null) {
-            return Process.runOnThread(this.id, block);
+            return Process.runOnThread(this.id, block) as Promise<T>;
         }
         let sendOrPostCallback: Object | null = null;
 
