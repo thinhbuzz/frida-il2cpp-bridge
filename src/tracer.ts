@@ -282,7 +282,7 @@ export function trace(parameters: boolean = false): TracerConfigure {
     const applierWithParameters = (): TracerApply => (method, state, threadId) => {
         const paddedVirtualAddress = method.relativeVirtualAddress.toString(16).padStart(8, '0');
 
-        const startIndex = +!method.isStatic | +unityVersionIsBelow201830;
+        const startIndex = +!method.isStatic | +unityVersionIsBelow201830.value;
 
         const callback = function (this: CallbackContext | InvocationContext, ...args: any[]) {
             if ((this as InvocationContext).threadId == threadId) {

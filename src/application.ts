@@ -4,6 +4,7 @@ import { Il2CppString } from './structs/string';
 import { raise } from './utils/console';
 import { lazyValue } from './utils/lazy';
 import * as UnityVersion from './utils/unity-version';
+import { lt } from './utils/unity-version';
 
 /**
  * Gets the data path name of the current application, e.g.
@@ -104,9 +105,9 @@ export const unityVersion = lazyValue(() => {
     raise('couldn\'t determine the Unity version, please specify it manually');
 });
 
-export const unityVersionIsBelow201830 = UnityVersion.lt(unityVersion.value, '2018.3.0');
+export const unityVersionIsBelow201830 = lazyValue(() => lt(unityVersion.value, '2018.3.0'));
 
-export const unityVersionIsBelow202120 = UnityVersion.lt(unityVersion.value, '2021.2.0');
+export const unityVersionIsBelow202120 = lazyValue(() => lt(unityVersion.value, '2021.2.0'));
 
 export function unityEngineCall(method: string): string | null {
     const handle = resolveInternalCall.value(Memory.allocUtf8String('UnityEngine.Application::' + method));

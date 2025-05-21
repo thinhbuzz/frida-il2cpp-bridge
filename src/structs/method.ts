@@ -60,7 +60,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
             types.push(parameter.type.fridaAlias);
         }
 
-        if (!this.isStatic || unityVersionIsBelow201830) {
+        if (!this.isStatic || unityVersionIsBelow201830.value) {
             types.unshift('pointer');
         }
 
@@ -255,7 +255,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     invokeRaw(instance: NativePointerValue, ...parameters: ParameterType[]): T {
         const allocatedParameters = parameters.map(toFridaValue);
 
-        if (!this.isStatic || unityVersionIsBelow201830) {
+        if (!this.isStatic || unityVersionIsBelow201830.value) {
             allocatedParameters.unshift(instance);
         }
 
@@ -377,7 +377,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
     }
 
     wrap(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T): NativeCallback<any, any> {
-        const startIndex = +!this.isStatic | +unityVersionIsBelow201830;
+        const startIndex = +!this.isStatic | +unityVersionIsBelow201830.value;
         return new NativeCallback(
             (...args: NativeCallbackArgumentValue[]): NativeCallbackReturnValue => {
                 const thisObject = this.isStatic
