@@ -92,7 +92,7 @@ export function choose(klass: Class): Il2CppObject[] {
 
     const chooseCallback = new NativeCallback(callback, 'void', ['pointer', 'int', 'pointer']);
 
-    if (unityVersionIsBelow202120) {
+    if (unityVersionIsBelow202120.value) {
         const onWorld = new NativeCallback(() => {}, 'void', []);
         const state = livenessCalculationBegin.value(klass, 0, chooseCallback, NULL, onWorld, onWorld);
 

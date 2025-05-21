@@ -20,7 +20,7 @@ export class Image extends NativeStruct {
     /** Gets the amount of classes defined in this image. */
     @lazy
     get classCount(): number {
-        if (unityVersionIsBelow201830) {
+        if (unityVersionIsBelow201830.value) {
             return this.classes.length;
         } else {
             return imageGetClassCount.value(this);
@@ -30,7 +30,7 @@ export class Image extends NativeStruct {
     /** Gets the classes defined in this image. */
     @lazy
     get classes(): Class[] {
-        if (unityVersionIsBelow201830) {
+        if (unityVersionIsBelow201830.value) {
             const types = this.assembly.object.method<Il2CppArray<Il2CppObject>>('GetTypes').invoke(false);
             // In Unity 5.3.8f1, getting System.Reflection.Emit.OpCodes type name
             // without iterating all the classes first somehow blows things up at
