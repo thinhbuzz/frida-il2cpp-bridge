@@ -4,10 +4,10 @@ import { getter } from '../utils/getter';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
-import { Array } from './array';
+import { Il2CppArray } from './array';
 import { domain } from './domain';
 import { Image } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { string } from './string';
 
 @recycle
@@ -34,9 +34,9 @@ export class Assembly extends NativeStruct {
                 // (despite being excluded from System.Reflection.Assembly::GetTypes).
                 return new Image(
                     this.object
-                        .method<Object>('GetType', 1)
+                        .method<Il2CppObject>('GetType', 1)
                         .invoke(string('<Module>'))
-                        .method<Object>('get_Module')
+                        .method<Il2CppObject>('get_Module')
                         .invoke()
                         .field<NativePointer>('_impl').value,
                 );
@@ -56,8 +56,8 @@ export class Assembly extends NativeStruct {
 
     /** Gets the encompassing object of the current assembly. */
     @lazy
-    get object(): Object {
-        for (const _ of domain.value.object.method<Array<Object>>('GetAssemblies', 1).invoke(false)) {
+    get object(): Il2CppObject {
+        for (const _ of domain.value.object.method<Il2CppArray<Il2CppObject>>('GetAssemblies', 1).invoke(false)) {
             if (_.field<NativePointer>('_mono_assembly').value.equals(this)) {
                 return _;
             }

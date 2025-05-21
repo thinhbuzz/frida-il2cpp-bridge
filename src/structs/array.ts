@@ -7,12 +7,12 @@ import { offsetOf } from '../utils/offset-of';
 import { Class } from './class';
 import { FieldType } from './field';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Pointer } from './pointer';
 import { string } from './string';
 import { Type } from './type';
 
-export class Array<T extends FieldType = FieldType> extends NativeStruct implements Iterable<T> {
+export class Il2CppArray<T extends FieldType = FieldType> extends NativeStruct implements Iterable<T> {
     /** Gets the Il2CppArray struct size, possibly equal to `Process.pointerSize * 4`. */
     @lazy
     static get headerSize(): number {
@@ -24,14 +24,14 @@ export class Array<T extends FieldType = FieldType> extends NativeStruct impleme
         // We previosly obtained an array whose content is known by calling
         // 'System.String::Split(NULL)' on a known string. However, that
         // method invocation somehow blows things up in Unity 2018.3.0f1.
-        const array = string('v').object.method<Array>('ToCharArray', 0).invoke();
+        const array = string('v').object.method<Il2CppArray>('ToCharArray', 0).invoke();
 
         // prettier-ignore
         const offset = offsetOf(array.handle, _ => _.readS16() == 118) ??
             raise('couldn\'t find the elements offset in the native array struct');
 
         // prettier-ignore
-        getter(Array.prototype, 'elements', function (this: Array) {
+        getter(Il2CppArray.prototype, 'elements', function (this: Il2CppArray) {
             return new Pointer(this.handle.add(offset), this.elementType);
         }, lazy);
 
@@ -58,8 +58,8 @@ export class Array<T extends FieldType = FieldType> extends NativeStruct impleme
 
     /** Gets the encompassing object of the current array. */
     @lazy
-    get object(): Object {
-        return new Object(this);
+    get object(): Il2CppObject {
+        return new Il2CppObject(this);
     }
 
     /** Gets the element at the specified index of the current array. */
@@ -94,14 +94,14 @@ export class Array<T extends FieldType = FieldType> extends NativeStruct impleme
 }
 
 /** Creates a new empty array of the given length. */
-export function array<T extends FieldType>(klass: Class, length: number): Array<T>;
+export function array<T extends FieldType>(klass: Class, length: number): Il2CppArray<T>;
 
 /** Creates a new array with the given elements. */
-export function array<T extends FieldType>(klass: Class, elements: T[]): Array<T>;
+export function array<T extends FieldType>(klass: Class, elements: T[]): Il2CppArray<T>;
 
-export function array<T extends FieldType>(klass: Class, lengthOrElements: number | T[]): Array<T> {
+export function array<T extends FieldType>(klass: Class, lengthOrElements: number | T[]): Il2CppArray<T> {
     const length = typeof lengthOrElements == 'number' ? lengthOrElements : lengthOrElements.length;
-    const array = new Array<T>(arrayNew.value(klass, length));
+    const array = new Il2CppArray<T>(arrayNew.value(klass, length));
 
     if (globalThis.Array.isArray(lengthOrElements)) {
         array.elements.write(lengthOrElements);

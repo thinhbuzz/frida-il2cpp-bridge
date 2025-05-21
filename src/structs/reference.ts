@@ -1,12 +1,12 @@
 import { read, write } from '../memory';
 import { raise } from '../utils/console';
 import { NativeStruct } from '../utils/native-struct';
-import { Array } from './array';
+import { Il2CppArray } from './array';
 import { FieldType } from './field';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Pointer } from './pointer';
-import { String } from './string';
+import { Il2CppString } from './string';
 import { Type } from './type';
 import { ValueType } from './value-type';
 
@@ -69,9 +69,9 @@ export function reference<T extends FieldType>(value: T, type?: Type): Reference
         case 'object':
             if (value instanceof ValueType || value instanceof Pointer) {
                 return new Reference<T>(value.handle, value.type);
-            } else if (value instanceof Object) {
+            } else if (value instanceof Il2CppObject) {
                 return new Reference<T>(handle.writePointer(value), value.class.type);
-            } else if (value instanceof String || value instanceof Array) {
+            } else if (value instanceof Il2CppString || value instanceof Il2CppArray) {
                 return new Reference<T>(handle.writePointer(value), value.object.class.type);
             } else if (value instanceof NativePointer) {
                 switch (type?.typeEnum) {

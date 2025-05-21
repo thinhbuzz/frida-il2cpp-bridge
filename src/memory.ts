@@ -1,11 +1,11 @@
-import { Array } from './structs/array';
+import { Il2CppArray } from './structs/array';
 import { FieldType } from './structs/field';
 import { MethodReturnType } from './structs/method';
-import { Object } from './structs/object';
+import { Il2CppObject } from './structs/object';
 import { ParameterType } from './structs/parameter';
 import { Pointer } from './structs/pointer';
 import { Reference } from './structs/reference';
-import { String } from './structs/string';
+import { Il2CppString } from './structs/string';
 import { Type } from './structs/type';
 import { ValueType } from './structs/value-type';
 import { raise } from './utils/console';
@@ -45,14 +45,14 @@ export function read(pointer: NativePointer, type: Type): FieldType {
             return new ValueType(pointer, type);
         case Type.enum.object:
         case Type.enum.class:
-            return new Object(pointer.readPointer());
+            return new Il2CppObject(pointer.readPointer());
         case Type.enum.genericInstance:
-            return type.class.isValueType ? new ValueType(pointer, type) : new Object(pointer.readPointer());
+            return type.class.isValueType ? new ValueType(pointer, type) : new Il2CppObject(pointer.readPointer());
         case Type.enum.string:
-            return new String(pointer.readPointer());
+            return new Il2CppString(pointer.readPointer());
         case Type.enum.array:
         case Type.enum.multidimensionalArray:
-            return new Array(pointer.readPointer());
+            return new Il2CppArray(pointer.readPointer());
     }
 
     raise(`couldn't read the value from ${pointer} using an unhandled or unknown type ${type.name} (${type.typeEnum}), please file an issue`);
@@ -121,7 +121,7 @@ export function fromFridaValue(
 
         for (let i = 0; i < fields.length; i++) {
             const convertedValue = fromFridaValue(value[i], fields[i].type);
-            write(handle.add(fields[i].offset).sub(Object.headerSize), convertedValue, fields[i].type);
+            write(handle.add(fields[i].offset).sub(Il2CppObject.headerSize), convertedValue, fields[i].type);
         }
 
         return new ValueType(handle, type);
@@ -134,14 +134,14 @@ export function fromFridaValue(
             case Type.enum.pointer:
                 return new Pointer(value, type.class.baseType!);
             case Type.enum.string:
-                return new String(value);
+                return new Il2CppString(value);
             case Type.enum.class:
             case Type.enum.genericInstance:
             case Type.enum.object:
-                return new Object(value);
+                return new Il2CppObject(value);
             case Type.enum.array:
             case Type.enum.multidimensionalArray:
-                return new Array(value);
+                return new Il2CppArray(value);
             default:
                 return value;
         }

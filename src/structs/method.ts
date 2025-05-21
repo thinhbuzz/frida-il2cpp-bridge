@@ -20,11 +20,11 @@ import { getter } from '../utils/getter';
 import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { offsetOf } from '../utils/offset-of';
-import { array, Array } from './array';
+import { array, Il2CppArray } from './array';
 import { Class } from './class';
 import { FieldType } from './field';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Parameter, ParameterType } from './parameter';
 import { Type } from './type';
 import { ValueType } from './value-type';
@@ -78,7 +78,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
             return [];
         }
 
-        const types = this.object.method<Array<Object>>('GetGenericArguments').invoke();
+        const types = this.object.method<Il2CppArray<Il2CppObject>>('GetGenericArguments').invoke();
         return globalThis.Array.from(types).map(_ => new Class(classFromObject.value(_)));
     }
 
@@ -148,8 +148,8 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
 
     /** Gets the encompassing object of the current method. */
     @lazy
-    get object(): Object {
-        return new Object(methodGetObject.value(this, NULL));
+    get object(): Il2CppObject {
+        return new Il2CppObject(methodGetObject.value(this, NULL));
     }
 
     /** Gets the amount of parameters of this method. */
@@ -182,7 +182,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
 
     /** Gets the virtual address (VA) of this method. */
     get virtualAddress(): NativePointer {
-        const FilterTypeName = corlib.value.class('System.Reflection.Module').initialize().field<Object>(
+        const FilterTypeName = corlib.value.class('System.Reflection.Module').initialize().field<Il2CppObject>(
             'FilterTypeName').value;
         const FilterTypeNameMethodPointer = FilterTypeName.field<NativePointer>('method_ptr').value;
         const FilterTypeNameMethod = FilterTypeName.field<NativePointer>('method').value;
@@ -208,7 +208,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     }
 
     /** Replaces the body of this method. */
-    set implementation(block: (this: Class | Object | ValueType, ...parameters: ParameterType[]) => T) {
+    set implementation(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T) {
         try {
             Interceptor.replace(this.virtualAddress, this.wrap(block));
         } catch (e: any) {
@@ -240,7 +240,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
         const types = classes.map(_ => _.type.object);
         const typeArray = array(corlib.value.class('System.Type'), types);
 
-        const inflatedMethodObject = this.object.method<Object>('MakeGenericMethod', 1).invoke(typeArray);
+        const inflatedMethodObject = this.object.method<Il2CppObject>('MakeGenericMethod', 1).invoke(typeArray);
         return new Method(inflatedMethodObject.field<NativePointer>('mhandle').value);
     }
 
@@ -335,7 +335,7 @@ ${this.name}\
 ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toString(16).padStart(8, `0`)}`}`;
     }
 
-    withHolder(instance: Object | ValueType): Method<T> {
+    withHolder(instance: Il2CppObject | ValueType): Method<T> {
         if (this.isStatic) {
             raise(`cannot access static method ${this.class.type.name}::${this.name} from an object, use a class instead`);
         }
@@ -356,7 +356,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                         const handle =
                             instance instanceof ValueType
                                 ? target.class.isValueType
-                                    ? instance.handle.add(maybeObjectHeaderSize.value - Object.headerSize)
+                                    ? instance.handle.add(maybeObjectHeaderSize.value - Il2CppObject.headerSize)
                                     : raise(`cannot invoke method ${target.class.type.name}::${target.name} against a value type, you must box it first`)
                                 : target.class.isValueType
                                     ? instance.handle.add(maybeObjectHeaderSize.value)
@@ -376,7 +376,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
         });
     }
 
-    wrap(block: (this: Class | Object | ValueType, ...parameters: ParameterType[]) => T): NativeCallback<any, any> {
+    wrap(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T): NativeCallback<any, any> {
         const startIndex = +!this.isStatic | +unityVersionIsBelow201830;
         return new NativeCallback(
             (...args: NativeCallbackArgumentValue[]): NativeCallbackReturnValue => {
@@ -384,11 +384,11 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                     ? this.class
                     : this.class.isValueType
                         ? new ValueType(
-                            (args[0] as NativePointer).add(Object.headerSize - maybeObjectHeaderSize.value),
+                            (args[0] as NativePointer).add(Il2CppObject.headerSize - maybeObjectHeaderSize.value),
                             this.class.type,
                         )
-                        : new Object(args[0] as NativePointer);
-                thisObject.currentMethod = this.isStatic ? this : this.withHolder(thisObject as (Object | ValueType));
+                        : new Il2CppObject(args[0] as NativePointer);
+                thisObject.currentMethod = this.isStatic ? this : this.withHolder(thisObject as (Il2CppObject | ValueType));
                 const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
                 const result = block.call(thisObject, ...parameters);
                 return toFridaValue(result);
@@ -407,7 +407,7 @@ export const maybeObjectHeaderSize = lazyValue((): number => {
     // if it's not where it is supposed to be, it means struct methods
     // assume they are receiving value types (that is a pointer to raw data)
     // hence, we must "skip" the object header when invoking such methods.
-    return struct.field<NativePointer>('value').value.equals(ptr(0xdeadbeef)) ? 0 : Object.headerSize;
+    return struct.field<NativePointer>('value').value.equals(ptr(0xdeadbeef)) ? 0 : Il2CppObject.headerSize;
 });
 
 export type MethodReturnType = void | FieldType;

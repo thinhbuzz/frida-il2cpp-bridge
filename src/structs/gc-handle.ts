@@ -1,5 +1,5 @@
-import { gcHandleGetTarget, gcHandleFree } from '../api';
-import { Object } from './object';
+import { gcHandleFree, gcHandleGetTarget } from '../api';
+import { Il2CppObject } from './object';
 
 export class GCHandle {
 
@@ -7,8 +7,8 @@ export class GCHandle {
     }
 
     /** Gets the object associated to this handle. */
-    get target(): Object | null {
-        return new Object(gcHandleGetTarget.value(this.handle)).asNullable();
+    get target(): Il2CppObject | null {
+        return new Il2CppObject(gcHandleGetTarget.value(this.handle)).asNullable();
     }
 
     /** Frees this handle. */

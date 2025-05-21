@@ -4,7 +4,7 @@ import { NativeStruct } from '../utils/native-struct';
 import { readNativeIterator } from '../utils/read-native-iterator';
 import { readNativeList } from '../utils/read-native-list';
 import { Class } from './class';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 
 export class MemorySnapshot extends NativeStruct {
     /** Creates a memory snapshot with the given handle. */
@@ -20,12 +20,12 @@ export class MemorySnapshot extends NativeStruct {
 
     /** Gets the objects tracked by this memory snapshot. */
     @lazy
-    get objects(): Object[] {
+    get objects(): Il2CppObject[] {
         // prettier-ignore
         return readNativeList(_ => memorySnapshotGetObjects.value(
             this,
             _,
-        )).filter(_ => !_.isNull()).map(_ => new Object(_));
+        )).filter(_ => !_.isNull()).map(_ => new Il2CppObject(_));
     }
 
     /** Captures a memory snapshot. */
