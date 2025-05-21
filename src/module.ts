@@ -1,8 +1,5 @@
 import { getCorlib, initialize as il2cppInitialize } from './api';
-import { apiLevel } from './utils/android';
-import { raise } from './utils/console';
 import { lazyValue } from './utils/lazy';
-import { forModule } from './utils/native-wait';
 
 /**
  * Gets the IL2CPP module (a *native library*), that is where the IL2CPP
@@ -29,19 +26,13 @@ import { forModule } from './utils/native-wait';
  * ```
  */
 export const module = lazyValue(() => {
-    const [moduleName, fallback] = getExpectedModuleNames();
-    return Process.findModuleByName(moduleName) ?? Process.getModuleByName(fallback);
+    return Process.findModuleByName(expectedModuleName)!;
 });
 
 /**
  * Waits for the IL2CPP native library to be loaded and initialized.
  */
 export async function initialize(blocking = false): Promise<boolean> {
-    module.value = Process.platform == 'darwin'
-        ? Process.findModuleByAddress(DebugSymbol.fromName('il2cpp_init').address)
-        ?? await forModule(...getExpectedModuleNames())
-        : await forModule(...getExpectedModuleNames());
-
     // At this point, the IL2CPP native library has been loaded, but we
     // cannot interact with IL2CPP until `il2cpp_init` is done.
     // It looks like `il2cpp_get_corlib` returns NULL only when the
@@ -60,19 +51,4 @@ export async function initialize(blocking = false): Promise<boolean> {
     return false;
 }
 
-export function getExpectedModuleNames(): string[] {
-    if ((globalThis as any).IL2CPP_MODULE_NAME) {
-        return [(globalThis as any).IL2CPP_MODULE_NAME];
-    }
-
-    switch (Process.platform) {
-        case 'linux':
-            return [apiLevel.value ? 'libil2cpp.so' : 'GameAssembly.so'];
-        case 'windows':
-            return ['GameAssembly.dll'];
-        case 'darwin':
-            return ['UnityFramework', 'GameAssembly.dylib'];
-    }
-
-    raise(`${Process.platform} is not supported yet`);
-}
+export const expectedModuleName = 'libil2cpp.so';

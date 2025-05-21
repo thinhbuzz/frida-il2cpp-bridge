@@ -18,19 +18,17 @@ export class Thread extends NativeStruct {
         };
 
         // https://github.com/mono/linux-packaging-mono/blob/d586f84dfea30217f34b076a616a098518aa72cd/mono/utils/mono-threads.h#L642
-        if (Process.platform != 'windows') {
-            const currentThreadId = Process.getCurrentThreadId();
-            const currentPosixThread = ptr(get.apply(currentThread.value!));
+        const currentThreadId = Process.getCurrentThreadId();
+        const currentPosixThread = ptr(get.apply(currentThread.value!));
 
-            // prettier-ignore
-            const offset = offsetOf(currentPosixThread, _ => _.readS32() == currentThreadId, 1024) ??
-                raise(`couldn't find the offset for determining the kernel id of a posix thread`);
+        // prettier-ignore
+        const offset = offsetOf(currentPosixThread, _ => _.readS32() == currentThreadId, 1024) ??
+            raise(`couldn't find the offset for determining the kernel id of a posix thread`);
 
-            const _get = get;
-            get = function (this: Thread) {
-                return ptr(_get.apply(this)).add(offset).readS32();
-            };
-        }
+        const _get = get;
+        get = function (this: Thread) {
+            return ptr(_get.apply(this)).add(offset).readS32();
+        };
 
         getter(Thread.prototype, 'id', get, lazy);
 
