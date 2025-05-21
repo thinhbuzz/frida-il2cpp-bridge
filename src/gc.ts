@@ -23,7 +23,7 @@ import {
 } from './api';
 import { unityVersionIsBelow202120 } from './application';
 import { Class } from './structs/class';
-import { Object } from './structs/object';
+import { Il2CppObject } from './structs/object';
 
 /**
  * Gets the heap size in bytes.
@@ -81,12 +81,12 @@ export function getUsedHeapSize(): Int64 {
  * Returns the heap allocated objects of the specified class. \
  * This variant reads GC descriptors.
  */
-export function choose(klass: Class): Object[] {
-    const matches: Object[] = [];
+export function choose(klass: Class): Il2CppObject[] {
+    const matches: Il2CppObject[] = [];
 
     const callback = (objects: NativePointer, size: number) => {
         for (let i = 0; i < size; i++) {
-            matches.push(new Object(objects.add(i * Process.pointerSize).readPointer()));
+            matches.push(new Il2CppObject(objects.add(i * Process.pointerSize).readPointer()));
         }
     };
 

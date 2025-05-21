@@ -21,10 +21,10 @@ import { BoundField, Field, FieldType } from './field';
 import { GCHandle } from './gc-handle';
 import { corlib } from './image';
 import { BoundMethod, Method, MethodReturnType } from './method';
-import { String } from './string';
+import { Il2CppString } from './string';
 import { ValueType } from './value-type';
 
-export class Object extends NativeStruct {
+export class Il2CppObject extends NativeStruct {
     /** Available in implementation block. */
     currentMethod?: Method;
 
@@ -66,22 +66,22 @@ export class Object extends NativeStruct {
      * console.log(bar.base.foo()); // 1
      * ```
      */
-    get base(): Object {
+    get base(): Il2CppObject {
         if (this.class.parent == null) {
             raise(`class ${this.class.type.name} has no parent`);
         }
 
         return new Proxy(this, {
             get(
-                target: Object,
-                property: keyof Object,
-                receiver: Object,
+                target: Il2CppObject,
+                property: keyof Il2CppObject,
+                receiver: Il2CppObject,
             ): any {
                 if (property == 'class') {
                     return Reflect.get(target, property).parent;
                 } else if (property == 'base') {
                     return Reflect.getOwnPropertyDescriptor(
-                        Object.prototype,
+                        Il2CppObject.prototype,
                         property,
                     )!.get!.bind(receiver)();
                 }
@@ -195,7 +195,7 @@ export class Object extends NativeStruct {
     toString(): string {
         return this.isNull()
             ? 'null'
-            : this.method<String>('ToString', 0).invoke().content ?? 'null';
+            : this.method<Il2CppString>('ToString', 0).invoke().content ?? 'null';
     }
 
     /** Unboxes the value type (either a primitive, a struct or an enum) out of this object. */

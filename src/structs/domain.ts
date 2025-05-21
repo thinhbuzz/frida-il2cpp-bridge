@@ -4,10 +4,10 @@ import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { readNativeList } from '../utils/read-native-list';
 import { recycle } from '../utils/recycle';
-import { Array } from './array';
+import { Il2CppArray } from './array';
 import { Assembly } from './assembly';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Thread } from './thread';
 
 @recycle
@@ -18,7 +18,7 @@ export class Domain extends NativeStruct {
         let handles = readNativeList(_ => domainGetAssemblies.value(this, _));
 
         if (handles.length == 0) {
-            const assemblyObjects = this.object.method<Array<Object>>('GetAssemblies').overload().invoke();
+            const assemblyObjects = this.object.method<Il2CppArray<Il2CppObject>>('GetAssemblies').overload().invoke();
             handles = globalThis.Array.from(assemblyObjects).map(_ => _.field<NativePointer>('_mono_assembly').value);
         }
 
@@ -27,8 +27,8 @@ export class Domain extends NativeStruct {
 
     /** Gets the encompassing object of the application domain. */
     @lazy
-    get object(): Object {
-        return corlib.value.class('System.AppDomain').method<Object>('get_CurrentDomain').invoke();
+    get object(): Il2CppObject {
+        return corlib.value.class('System.AppDomain').method<Il2CppObject>('get_CurrentDomain').invoke();
     }
 
     /** Opens and loads the assembly with the given name. */

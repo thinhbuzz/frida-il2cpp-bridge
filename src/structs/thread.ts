@@ -8,7 +8,7 @@ import { readNativeList } from '../utils/read-native-list';
 import { Class } from './class';
 import { cleanupDelegates, delegate } from './delegate';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 
 export class Thread extends NativeStruct {
     /** Gets the native id of the current thread. */
@@ -39,8 +39,8 @@ export class Thread extends NativeStruct {
 
     /** Gets the encompassing internal object (System.Threding.InternalThreead) of the current thread. */
     @lazy
-    get internal(): Object {
-        return this.object.tryField<Object>('internal_thread')?.value ?? this.object;
+    get internal(): Il2CppObject {
+        return this.object.tryField<Il2CppObject>('internal_thread')?.value ?? this.object;
     }
 
     /** Determines whether the current thread is the garbage collector finalizer one. */
@@ -57,8 +57,8 @@ export class Thread extends NativeStruct {
 
     /** Gets the encompassing object of the current thread. */
     @lazy
-    get object(): Object {
-        return new Object(this);
+    get object(): Il2CppObject {
+        return new Il2CppObject(this);
     }
 
     @lazy
@@ -67,8 +67,8 @@ export class Thread extends NativeStruct {
     }
 
     @lazy
-    private get synchronizationContext(): Object | null {
-        const get_ExecutionContext = this.object.tryMethod<Object>('GetMutableExecutionContext') ?? this.object.method('get_ExecutionContext');
+    private get synchronizationContext(): Il2CppObject | null {
+        const get_ExecutionContext = this.object.tryMethod<Il2CppObject>('GetMutableExecutionContext') ?? this.object.method('get_ExecutionContext');
         const executionContext = get_ExecutionContext.invoke();
 
         // From what I observed, only the main thread is supposed to have a
@@ -77,8 +77,8 @@ export class Thread extends NativeStruct {
         // 1) during early instrumentation;
         // 2) it was dead code has it was stripped out.
         const synchronizationContext =
-            executionContext.tryField<Object>('_syncContext')?.value ??
-            executionContext.tryMethod<Object>('get_SynchronizationContext')?.invoke() ??
+            executionContext.tryField<Il2CppObject>('_syncContext')?.value ??
+            executionContext.tryMethod<Il2CppObject>('get_SynchronizationContext')?.invoke() ??
             this.tryLocalValue(corlib.value.class('System.Threading.SynchronizationContext'));
 
         return synchronizationContext?.asNullable() ?? null;
@@ -96,7 +96,7 @@ export class Thread extends NativeStruct {
         if (Post == null) {
             return Process.runOnThread(this.id, block) as Promise<T>;
         }
-        let sendOrPostCallback: Object | null = null;
+        let sendOrPostCallback: Il2CppObject | null = null;
 
         return new Promise(resolve => {
             sendOrPostCallback = delegate(corlib.value.class('System.Threading.SendOrPostCallback'), () => {
@@ -127,11 +127,11 @@ export class Thread extends NativeStruct {
             .finally(() => cleanupDelegates(sendOrPostCallback)) as Promise<T>;
     }
 
-    tryLocalValue(klass: Class): Object | undefined {
+    tryLocalValue(klass: Class): Il2CppObject | undefined {
         for (let i = 0; i < 16; i++) {
             const base = this.staticData.add(i * Process.pointerSize).readPointer();
             if (!base.isNull()) {
-                const object = new Object(base.readPointer()).asNullable();
+                const object = new Il2CppObject(base.readPointer()).asNullable();
                 if (object?.class?.isSubclassOf(klass, false)) {
                     return object;
                 }

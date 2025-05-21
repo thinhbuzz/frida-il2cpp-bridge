@@ -3,8 +3,8 @@ import { raise } from '../utils/console';
 import { NativeStruct } from '../utils/native-struct';
 import { BoundField, FieldType } from './field';
 import { BoundMethod, Method, MethodReturnType } from './method';
-import { Object } from './object';
-import { String } from './string';
+import { Il2CppObject } from './object';
+import { Il2CppString } from './string';
 import { Type } from './type';
 
 export class ValueType extends NativeStruct {
@@ -16,8 +16,8 @@ export class ValueType extends NativeStruct {
     }
 
     /** Boxes the current value type in a object. */
-    box(): Object {
-        return new Object(valueTypeBox.value(this.type.class, this));
+    box(): Il2CppObject {
+        return new Il2CppObject(valueTypeBox.value(this.type.class, this));
     }
 
     /** Gets the non-static field with the given name of the current class hierarchy. */
@@ -68,7 +68,7 @@ export class ValueType extends NativeStruct {
 
     /** */
     toString(): string {
-        const ToString = this.method<String>('ToString', 0);
+        const ToString = this.method<Il2CppString>('ToString', 0);
         return this.isNull()
             ? 'null'
             : // If ToString is defined within a value type class, we can

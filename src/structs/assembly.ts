@@ -3,10 +3,10 @@ import { raise } from '../utils/console';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
-import { Array } from './array';
+import { Il2CppArray } from './array';
 import { domain } from './domain';
 import { Image } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { string } from './string';
 
 @recycle
@@ -25,12 +25,12 @@ export class Assembly extends NativeStruct {
             // (despite being excluded from System.Reflection.Assembly::GetTypes).
             const runtimeModule =
                 this.object
-                    .tryMethod<Object>('GetType', 1)
+                    .tryMethod<Il2CppObject>('GetType', 1)
                     ?.invoke(string('<Module>'))
                     ?.asNullable()
-                    ?.tryMethod<Object>('get_Module')
+                    ?.tryMethod<Il2CppObject>('get_Module')
                     ?.invoke() ??
-                this.object.tryMethod<Array<Object>>('GetModules', 1)?.invoke(false)?.get(0) ??
+                this.object.tryMethod<Il2CppArray<Il2CppObject>>('GetModules', 1)?.invoke(false)?.get(0) ??
                 raise(`couldn't find the runtime module object of assembly ${this.name}`);
 
             return new Image(runtimeModule.field<NativePointer>('_impl').value);
@@ -47,8 +47,8 @@ export class Assembly extends NativeStruct {
 
     /** Gets the encompassing object of the current assembly. */
     @lazy
-    get object(): Object {
-        for (const _ of domain.value.object.method<Array<Object>>('GetAssemblies', 1).invoke(false)) {
+    get object(): Il2CppObject {
+        for (const _ of domain.value.object.method<Il2CppArray<Il2CppObject>>('GetAssemblies', 1).invoke(false)) {
             if (_.field<NativePointer>('_mono_assembly').value.equals(this)) {
                 return _;
             }

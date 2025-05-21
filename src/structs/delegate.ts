@@ -2,14 +2,14 @@ import { raise } from '../utils/console';
 import { Class } from './class';
 import { corlib } from './image';
 import { MethodReturnType } from './method';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { ParameterType } from './parameter';
 
 /** Creates a delegate object of the given delegate class. */
 export function delegate<P extends ParameterType[], R extends MethodReturnType>(
     klass: Class,
     block: (...args: P) => R,
-): Object {
+): Il2CppObject {
     const SystemDelegate = corlib.value.class('System.Delegate');
     const SystemMulticastDelegate = corlib.value.class('System.MulticastDelegate');
 

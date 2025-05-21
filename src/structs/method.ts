@@ -20,11 +20,11 @@ import { getter } from '../utils/getter';
 import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { offsetOf } from '../utils/offset-of';
-import { array, Array } from './array';
+import { array, Il2CppArray } from './array';
 import { Class } from './class';
 import { FieldType } from './field';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Parameter, ParameterType } from './parameter';
 import { Reference } from './reference';
 import { Type } from './type';
@@ -79,7 +79,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
             return [];
         }
 
-        const types = this.object.method<Array<Object>>('GetGenericArguments').invoke();
+        const types = this.object.method<Il2CppArray<Il2CppObject>>('GetGenericArguments').invoke();
         return globalThis.Array.from(types).map(_ => new Class(classFromObject.value(_)));
     }
 
@@ -149,8 +149,8 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
 
     /** Gets the encompassing object of the current method. */
     @lazy
-    get object(): Object {
-        return new Object(methodGetObject.value(this, NULL));
+    get object(): Il2CppObject {
+        return new Il2CppObject(methodGetObject.value(this, NULL));
     }
 
     /** Gets the amount of parameters of this method. */
@@ -183,7 +183,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
 
     /** Gets the virtual address (VA) of this method. */
     get virtualAddress(): NativePointer {
-        const FilterTypeName = corlib.value.class('System.Reflection.Module').initialize().field<Object>(
+        const FilterTypeName = corlib.value.class('System.Reflection.Module').initialize().field<Il2CppObject>(
             'FilterTypeName').value;
         const FilterTypeNameMethodPointer = FilterTypeName.field<NativePointer>('method_ptr').value;
         const FilterTypeNameMethod = FilterTypeName.field<NativePointer>('method').value;
@@ -209,7 +209,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     }
 
     /** Replaces the body of this method. */
-    set implementation(block: (this: Class | Object | ValueType, ...parameters: ParameterType[]) => T) {
+    set implementation(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T) {
         try {
             Interceptor.replace(this.virtualAddress, this.wrap(block));
         } catch (e: any) {
@@ -242,7 +242,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
         const types = classes.map(_ => _.type.object);
         const typeArray = array(corlib.value.class('System.Type'), types);
 
-        const inflatedMethodObject = this.object.method<Object>('MakeGenericMethod', 1).invoke(typeArray);
+        const inflatedMethodObject = this.object.method<Il2CppObject>('MakeGenericMethod', 1).invoke(typeArray);
         return new Method(inflatedMethodObject.field<NativePointer>('mhandle').value);
     }
 
@@ -401,7 +401,7 @@ ${this.generics.length > 0 ? `<${this.generics.map(_ => _.type.name).join(',')}>
 ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toString(16).padStart(8, `0`)}`}`;
     }
 
-    bind(instance: Object | ValueType): BoundMethod<T> {
+    bind(instance: Il2CppObject | ValueType): BoundMethod<T> {
         if (this.isStatic) {
             raise(`cannot bind static method ${this.class.type.name}::${this.name} to an instance`);
         }
@@ -422,10 +422,10 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                         const handle =
                             instance instanceof ValueType
                                 ? target.class.isValueType
-                                    ? instance.handle.sub(structMethodsRequireObjectInstances.value ? Object.headerSize : 0)
+                                    ? instance.handle.sub(structMethodsRequireObjectInstances.value ? Il2CppObject.headerSize : 0)
                                     : raise(`cannot invoke method ${target.class.type.name}::${target.name} against a value type, you must box it first`)
                                 : target.class.isValueType
-                                    ? instance.handle.add(structMethodsRequireObjectInstances.value ? 0 : Object.headerSize)
+                                    ? instance.handle.add(structMethodsRequireObjectInstances.value ? 0 : Il2CppObject.headerSize)
                                     : instance.handle;
 
                         return target.invokeRaw.bind(target, handle);
@@ -451,7 +451,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
         });
     }
 
-    wrap(block: (this: Class | Object | ValueType, ...parameters: ParameterType[]) => T): NativeCallback<any, any> {
+    wrap(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T): NativeCallback<any, any> {
         const startIndex = +!this.isStatic | +unityVersionIsBelow201830;
         return new NativeCallback(
             (...args: NativeCallbackArgumentValue[]): NativeCallbackReturnValue => {
@@ -459,12 +459,12 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                     ? this.class
                     : this.class.isValueType
                         ? new ValueType(
-                            (args[0] as NativePointer).add(structMethodsRequireObjectInstances.value ? Object.headerSize : 0),
+                            (args[0] as NativePointer).add(structMethodsRequireObjectInstances.value ? Il2CppObject.headerSize : 0),
                             this.class.type,
                         )
-                        : new Object(args[0] as NativePointer);
+                        : new Il2CppObject(args[0] as NativePointer);
 
-                thisObject.currentMethod = this.isStatic ? this : this.bind(thisObject as (Object | ValueType));
+                thisObject.currentMethod = this.isStatic ? this : this.bind(thisObject as (Il2CppObject | ValueType));
                 const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
                 const result = block.call(thisObject, ...parameters);
                 return toFridaValue(result);
@@ -476,11 +476,11 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
 }
 
 /**
- * A {@link Method} bound to a {@link Object} or a
+ * A {@link Method} bound to a {@link Il2CppObject} or a
  * {@link ValueType} (also known as *instances*). \
  * Invoking bound methods will pass the assigned instance as `this`.
  * ```ts
- * const object: Object = string("Hello, world!").object;
+ * const object: Il2CppObject = string("Hello, world!").object;
  * const GetLength: BoundMethod<number> = object.method<number>("GetLength");
  * // There is no need to pass the object when invoking GetLength!
  * const length = GetLength.invoke(); // 13
@@ -493,7 +493,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
  * const SystemString = corlib.class("System.String");
  * const GetLength: Method<number> = SystemString.method<number>("GetLength");
  *
- * const object: Object = string("Hello, world!").object;
+ * const object: Il2CppObject = string("Hello, world!").object;
  * // ＠ts-ignore
  * const GetLengthBound: BoundMethod<number> = GetLength.bind(object);
  * ```

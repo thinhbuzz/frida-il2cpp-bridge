@@ -1,6 +1,6 @@
 import { threadGetCurrent } from './api';
 import { module } from './module';
-import { Object } from './structs/object';
+import { Il2CppObject } from './structs/object';
 import { inform } from './utils/console';
 
 /**
@@ -35,6 +35,6 @@ export function installExceptionListener(targetThread: 'current' | 'all' = 'curr
             return;
         }
 
-        inform(new Object(args[0].readPointer()));
+        inform(new Il2CppObject(args[0].readPointer()));
     });
 }

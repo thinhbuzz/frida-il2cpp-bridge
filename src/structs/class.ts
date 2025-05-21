@@ -43,11 +43,11 @@ import { NativeStruct } from '../utils/native-struct';
 import { offsetOf } from '../utils/offset-of';
 import { readNativeIterator } from '../utils/read-native-iterator';
 import { recycle } from '../utils/recycle';
-import { Array, array } from './array';
+import { array, Il2CppArray } from './array';
 import { Field, FieldType } from './field';
 import { corlib, Image } from './image';
 import { Method, MethodReturnType } from './method';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Type } from './type';
 
 @recycle
@@ -142,7 +142,7 @@ export class Class extends NativeStruct {
         if (!this.isGeneric && !this.isInflated) {
             return [];
         }
-        const types = this.type.object.method<Array<Object>>('GetGenericArguments').invoke();
+        const types = this.type.object.method<Il2CppArray<Il2CppObject>>('GetGenericArguments').invoke();
         return globalThis.Array.from(types).map(_ => new Class(classFromObject.value(_)));
     }
 
@@ -257,7 +257,7 @@ export class Class extends NativeStruct {
     /** Gets the pointer class of the current class. */
     @lazy
     get pointerClass(): Class {
-        return new Class(classFromObject.value(this.type.object.method<Object>('MakePointerType').invoke()));
+        return new Class(classFromObject.value(this.type.object.method<Il2CppObject>('MakePointerType').invoke()));
     }
 
     /** Gets the rank (number of dimensions) of the current array class. */
@@ -303,8 +303,8 @@ export class Class extends NativeStruct {
     }
 
     /** Allocates a new object of the current class. */
-    alloc(): Object {
-        return new Object(objectNew.value(this));
+    alloc(): Il2CppObject {
+        return new Il2CppObject(objectNew.value(this));
     }
 
     /** Gets the field identified by the given name. */
@@ -331,7 +331,7 @@ export class Class extends NativeStruct {
         }
         const types = classes.map(_ => _.type.object);
         const typeArray = array(corlib.value.class('System.Type'), types);
-        const inflatedType = this.type.object.method<Object>('MakeGenericType', 1).invoke(typeArray);
+        const inflatedType = this.type.object.method<Il2CppObject>('MakeGenericType', 1).invoke(typeArray);
         return new Class(classFromObject.value(inflatedType));
     }
 
@@ -365,7 +365,7 @@ export class Class extends NativeStruct {
     }
 
     /** Allocates a new object of the current class and calls its default constructor. */
-    new(): Object {
+    new(): Il2CppObject {
         const object = this.alloc();
 
         const exceptionArray = Memory.alloc(Process.pointerSize);
@@ -375,7 +375,7 @@ export class Class extends NativeStruct {
         const exception = exceptionArray.readPointer();
 
         if (!exception.isNull()) {
-            raise(new Object(exception).toString());
+            raise(new Il2CppObject(exception).toString());
         }
 
         return object;

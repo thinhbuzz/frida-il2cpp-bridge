@@ -1,6 +1,6 @@
 import { resolveInternalCall } from './api';
 import { module } from './module';
-import { String } from './structs/string';
+import { Il2CppString } from './structs/string';
 import { raise } from './utils/console';
 import { exportsHash } from './utils/hash';
 import { lazyValue } from './utils/lazy';
@@ -114,5 +114,5 @@ export function unityEngineCall(method: string): string | null {
     const handle = resolveInternalCall.value(Memory.allocUtf8String('UnityEngine.Application::' + method));
     const nativeFunction = new NativeFunction(handle, 'pointer', []);
 
-    return nativeFunction.isNull() ? null : new String(nativeFunction()).asNullable()?.content ?? null;
+    return nativeFunction.isNull() ? null : new Il2CppString(nativeFunction()).asNullable()?.content ?? null;
 }

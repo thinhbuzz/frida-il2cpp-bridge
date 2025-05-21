@@ -4,7 +4,7 @@ import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
 import { Class } from './class';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 
 @recycle
 export class Type extends NativeStruct {
@@ -147,8 +147,8 @@ export class Type extends NativeStruct {
 
     /** Gets the encompassing object of the current type. */
     @lazy
-    get object(): Object {
-        return new Object(typeGetObject.value(this));
+    get object(): Il2CppObject {
+        return new Il2CppObject(typeGetObject.value(this));
     }
 
     /** Gets the type enum of the current type. */
