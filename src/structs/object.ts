@@ -21,10 +21,10 @@ import { Field, FieldType } from './field';
 import { GCHandle } from './gc-handle';
 import { corlib } from './image';
 import { Method, MethodReturnType } from './method';
-import { String } from './string';
+import { Il2CppString } from './string';
 import { ValueType } from './value-type';
 
-export class Object extends NativeStruct {
+export class Il2CppObject extends NativeStruct {
     /** Available in implementation block. */
     currentMethod?: Method;
 
@@ -83,7 +83,7 @@ export class Object extends NativeStruct {
 
     /** */
     toString(): string {
-        return this.isNull() ? 'null' : this.method<String>('ToString', 0).invoke().content ?? 'null';
+        return this.isNull() ? 'null' : this.method<Il2CppString>('ToString', 0).invoke().content ?? 'null';
     }
 
     /** Unboxes the value type (either a primitive, a struct or an enum) out of this object. */

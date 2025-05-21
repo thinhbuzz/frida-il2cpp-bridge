@@ -1,21 +1,13 @@
-import {
-    classFromName,
-    classFromObject,
-    getCorlib,
-    imageGetAssembly,
-    imageGetClass,
-    imageGetClassCount,
-    imageGetName,
-} from '../api';
+import { classFromName, classFromObject, getCorlib, imageGetAssembly, imageGetClass, imageGetClassCount, imageGetName } from '../api';
 import { unityVersionIsBelow201830 } from '../application';
 import { raise } from '../utils/console';
 import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
-import { Array } from './array';
+import { Il2CppArray } from './array';
 import { Assembly } from './assembly';
 import { Class } from './class';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 
 @recycle
 export class Image extends NativeStruct {
@@ -39,7 +31,7 @@ export class Image extends NativeStruct {
     @lazy
     get classes(): Class[] {
         if (unityVersionIsBelow201830) {
-            const types = this.assembly.object.method<Array<Object>>('GetTypes').invoke(false);
+            const types = this.assembly.object.method<Il2CppArray<Il2CppObject>>('GetTypes').invoke(false);
             // In Unity 5.3.8f1, getting System.Reflection.Emit.OpCodes type name
             // without iterating all the classes first somehow blows things up at
             // app startup, hence the `Array.from`.

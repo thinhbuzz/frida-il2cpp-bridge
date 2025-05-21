@@ -1,23 +1,15 @@
-import {
-    fieldGetClass,
-    fieldGetFlags,
-    fieldGetName,
-    fieldGetOffset,
-    fieldGetStaticValue,
-    fieldGetType,
-    fieldSetStaticValue,
-} from '../api';
+import { fieldGetClass, fieldGetFlags, fieldGetName, fieldGetOffset, fieldGetStaticValue, fieldGetType, fieldSetStaticValue } from '../api';
 import { read, write } from '../memory';
 import { raise } from '../utils/console';
 import { getter } from '../utils/getter';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
-import { Array } from './array';
+import { Il2CppArray } from './array';
 import { Class } from './class';
 import { corlib } from './image';
-import { Object } from './object';
+import { Il2CppObject } from './object';
 import { Pointer } from './pointer';
-import { String } from './string';
+import { Il2CppString } from './string';
 import { Type } from './type';
 import { ValueType } from './value-type';
 
@@ -121,7 +113,7 @@ export class Field<T extends FieldType = FieldType> extends NativeStruct {
         const handle =
             // pointer-like values should be passed as-is, but boxed
             // value types (primitives included) must be unboxed first
-            value instanceof Object && this.type.class.isValueType
+            value instanceof Il2CppObject && this.type.class.isValueType
                 ? value.unbox()
                 : value instanceof NativeStruct
                     ? value.handle
@@ -146,12 +138,12 @@ ${this.isLiteral ? ` = ${this.type.class.isEnum ? read(
 ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)}`}`;
     }
 
-    withHolder(instance: Object | ValueType): Field<T> {
+    withHolder(instance: Il2CppObject | ValueType): Field<T> {
         if (this.isStatic) {
             raise(`cannot access static field ${this.class.type.name}::${this.name} from an object, use a class instead`);
         }
 
-        const valueHandle = instance.handle.add(this.offset - (instance instanceof ValueType ? Object.headerSize : 0));
+        const valueHandle = instance.handle.add(this.offset - (instance instanceof ValueType ? Il2CppObject.headerSize : 0));
 
         return new Proxy(this, {
             get(target: Field<T>, property: keyof Field): any {
@@ -181,9 +173,9 @@ export type FieldType =
     | NativePointer
     | Pointer
     | ValueType
-    | Object
-    | String
-    | Array;
+    | Il2CppObject
+    | Il2CppString
+    | Il2CppArray;
 
 export const enum FieldAttributes {
     FieldAccessMask = 0x0007,

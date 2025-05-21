@@ -1,5 +1,5 @@
 import { Class } from './structs/class';
-import { Object } from './structs/object';
+import { Il2CppObject } from './structs/object';
 import { Type } from './structs/type';
 
 /**
@@ -18,7 +18,7 @@ import { Type } from './structs/type';
  * const comparables = objects.filter(is(IComparable));
  * ```
  */
-export function is<T extends Class | Object | Type>(klass: Class): (element: T) => boolean {
+export function is<T extends Class | Il2CppObject | Type>(klass: Class): (element: T) => boolean {
     return (element: T): boolean => {
         if (element instanceof Class) {
             return klass.isAssignableFrom(element);
@@ -44,7 +44,7 @@ export function is<T extends Class | Object | Type>(klass: Class): (element: T) 
  * const strings = objects.filter(isExactly(String));
  * ```
  */
-export function isExactly<T extends Class | Object | Type>(klass: Class): (element: T) => boolean {
+export function isExactly<T extends Class | Il2CppObject | Type>(klass: Class): (element: T) => boolean {
     return (element: T): boolean => {
         if (element instanceof Class) {
             return element.equals(klass);
