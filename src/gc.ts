@@ -7,7 +7,6 @@ import {
     gcEnable as gcEnableNative,
     gcGetHeapSize as gcGetHeapSizeNative,
     gcGetMaxTimeSlice as gcGetMaxTimeSliceNative,
-    gcGetUsedSize as gcGetUsedSizeNative,
     gcIsDisabled as gcIsDisabledNative,
     gcIsIncremental as gcIsIncrementalNative,
     gcSetMaxTimeSlice as gcSetMaxTimeSliceNative,
@@ -68,13 +67,6 @@ export function getMaxTimeSlice(): Int64 {
  */
 export function setMaxTimeSlice(nanoseconds: number | Int64): void {
     gcSetMaxTimeSliceNative.value(nanoseconds);
-}
-
-/**
- * Gets the used heap size in bytes.
- */
-export function getUsedHeapSize(): Int64 {
-    return gcGetUsedSizeNative.value();
 }
 
 /**

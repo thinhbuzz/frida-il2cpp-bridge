@@ -1,4 +1,4 @@
-const pattern = /(20\d{2}|\d)\.(\d)\.(\d{1,2})(?:[abcfp]|rc){0,2}\d?/;
+export const pattern = /(20\d{2}|\d)\.(\d)\.(\d{1,2})(?:[abcfp]|rc){0,2}\d?/;
 
 export function find(string: string | null): string | undefined {
     return string?.match(pattern)?.[0];
