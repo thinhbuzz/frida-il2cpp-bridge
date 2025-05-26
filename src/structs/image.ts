@@ -35,12 +35,16 @@ export class Image extends NativeStruct {
             // In Unity 5.3.8f1, getting System.Reflection.Emit.OpCodes type name
             // without iterating all the classes first somehow blows things up at
             // app startup, hence the `Array.from`.
-            const classes = globalThis.Array.from(types, _ => new Class(classFromObject.value(_)));
-            classes.unshift(this.class('<Module>'));
+            const classes = Array.from(types, _ => new Class(classFromObject.value(_)));
+            const Module = this.tryClass("<Module>");
+            if (Module) {
+                classes.unshift(Module);
+            }
+
             return classes;
         } else {
-            return globalThis.Array.from(
-                globalThis.Array(this.classCount),
+            return Array.from(
+                Array(this.classCount),
                 (_, i) => new Class(imageGetClass.value(this, i)),
             );
         }

@@ -2,9 +2,9 @@ import { resolveInternalCall } from './api';
 import { module } from './module';
 import { Il2CppString } from './structs/string';
 import { raise } from './utils/console';
+import { exportsHash } from './utils/hash';
 import { lazyValue } from './utils/lazy';
-import * as UnityVersion from './utils/unity-version';
-import { lt } from './utils/unity-version';
+import { find, lt } from './utils/unity-version';
 
 /**
  * Gets the data path name of the current application, e.g.
@@ -38,7 +38,7 @@ export function getDataPath(): string | null {
  * ```
  */
 export function getIdentifier(): string | null {
-    return unityEngineCall('get_identifier') ?? unityEngineCall('get_bundleIdentifier');
+    return unityEngineCall("get_identifier") ?? unityEngineCall("get_bundleIdentifier") ?? Process.mainModule.name;
 }
 
 /**
@@ -54,7 +54,7 @@ export function getIdentifier(): string | null {
  * ```
  */
 export function getVersion(): string | null {
-    return unityEngineCall('get_version');
+    return unityEngineCall("get_version") ?? exportsHash(module.value).toString(16);
 }
 
 /**
@@ -94,7 +94,7 @@ export const unityVersion = lazyValue(() => {
             while (address.readU8() != 0) {
                 address = address.sub(1);
             }
-            const match = UnityVersion.find(address.add(1).readCString());
+            const match = find(address.add(1).readCString());
 
             if (match != undefined) {
                 return match;

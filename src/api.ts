@@ -326,6 +326,8 @@ export const threadGetCurrent = lazyNativeValue('il2cpp_thread_current', 'pointe
 
 export const threadIsVm = lazyNativeValue('il2cpp_is_vm_thread', 'bool', ['pointer']);
 
+export const typeEquals = lazyNativeValue('il2cpp_type_equals', 'bool', ['pointer', 'pointer']);
+
 export const typeGetClass = lazyNativeValue('il2cpp_class_from_type', 'pointer', ['pointer']);
 
 export const typeGetName = lazyNativeValue('il2cpp_type_get_name', 'pointer', ['pointer']);

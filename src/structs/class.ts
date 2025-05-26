@@ -125,6 +125,17 @@ export class Class extends NativeStruct {
         return this.namespace ? `${this.namespace}.${this.name}` : this.name;
     }
 
+    /** Gets the generic class of the current class if the current class is inflated. */
+    get genericClass(): Class | null {
+        // We leverage two things here:
+        // 1) inflated classes belong to the same assembly of the generic
+        // class;
+        // 2) inflated classes have the generic class name as their name,
+        // e.g. type name is Foo<Bar>, but class name is Foo`1.
+        const klass = this.image.tryClass(this.fullName)?.asNullable();
+        return klass?.equals(this) ? null : klass ?? null;
+    }
+
     /** Gets the generics parameters of this generic class. */
     @lazy
     get generics(): Class[] {
@@ -132,7 +143,7 @@ export class Class extends NativeStruct {
             return [];
         }
         const types = this.type.object.method<Il2CppArray<Il2CppObject>>('GetGenericArguments').invoke();
-        return globalThis.Array.from(types).map(_ => new Class(classFromObject.value(_)));
+        return Array.from(types).map(_ => new Class(classFromObject.value(_)));
     }
 
     /** Determines whether the GC has tracking references to the current class instances. */
@@ -227,8 +238,8 @@ export class Class extends NativeStruct {
 
     /** Gets the namespace of the current class. */
     @lazy
-    get namespace(): string {
-        return classGetNamespace.value(this).readUtf8String()!;
+    get namespace(): string | undefined {
+        return classGetNamespace.value(this).readUtf8String() || undefined;
     }
 
     /** Gets the classes nested inside the current class. */
@@ -241,6 +252,12 @@ export class Class extends NativeStruct {
     @lazy
     get parent(): Class | null {
         return new Class(classGetParent.value(this)).asNullable();
+    }
+
+    /** Gets the pointer class of the current class. */
+    @lazy
+    get pointerClass(): Class {
+        return new Class(classFromObject.value(this.type.object.method<Il2CppObject>('MakePointerType').invoke()));
     }
 
     /** Gets the rank (number of dimensions) of the current array class. */
@@ -293,6 +310,15 @@ export class Class extends NativeStruct {
     /** Gets the field identified by the given name. */
     field<T extends FieldType>(name: string): Field<T> {
         return this.tryField<T>(name) ?? raise(`couldn't find field ${name} in class ${this.type.name}`);
+    }
+
+    /** Gets the hierarchy of the current class. */
+    * hierarchy(options?: { includeCurrent?: boolean }): Generator<Class> {
+        let klass: Class | null = options?.includeCurrent ?? true ? this : this.parent;
+        while (klass) {
+            yield klass;
+            klass = klass.parent;
+        }
     }
 
     /** Builds a generic instance of the current generic class. */

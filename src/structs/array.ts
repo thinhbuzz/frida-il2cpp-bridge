@@ -103,7 +103,7 @@ export function array<T extends FieldType>(klass: Class, lengthOrElements: numbe
     const length = typeof lengthOrElements == 'number' ? lengthOrElements : lengthOrElements.length;
     const array = new Il2CppArray<T>(arrayNew.value(klass, length));
 
-    if (globalThis.Array.isArray(lengthOrElements)) {
+    if (Array.isArray(lengthOrElements)) {
         array.elements.write(lengthOrElements);
     }
 

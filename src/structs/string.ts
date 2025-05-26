@@ -16,7 +16,7 @@ export class Il2CppString extends NativeStruct {
         const offset = offsetOf(string('vfsfitvnm').handle, _ => _.readInt() == 9)
             ?? raise('couldn\'t find the length offset in the native string struct');
 
-        globalThis.Object.defineProperty(Il2CppString.prototype, 'content', {
+        Object.defineProperty(Il2CppString.prototype, 'content', {
             set(this: Il2CppString, value: string | null) {
                 stringGetChars.value(this).writeUtf16String(value ?? '');
                 this.handle.add(offset).writeS32(value?.length ?? 0);
