@@ -79,7 +79,7 @@ export function getVersion(): string | null {
  */
 export const unityVersion = lazyValue(() => {
     try {
-        const unityVersion = (globalThis as any).IL2CPP_UNITY_VERSION ?? unityEngineCall('get_unityVersion');
+        const unityVersion = unityEngineCall('get_unityVersion');
 
         if (unityVersion != null) {
             return unityVersion;

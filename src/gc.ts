@@ -14,13 +14,10 @@ import {
     gcStartWorld as gcStartWorldNative,
     gcStopWorld as gcStopWorldNative,
     livenessAllocateStruct,
-    livenessCalculationBegin,
-    livenessCalculationEnd,
     livenessCalculationFromStatics,
     livenessFinalize,
     livenessFreeStruct,
 } from './api';
-import { unityVersionIsBelow202120 } from './application';
 import { Class } from './structs/class';
 import { Il2CppObject } from './structs/object';
 
@@ -84,34 +81,26 @@ export function choose(klass: Class): Il2CppObject[] {
 
     const chooseCallback = new NativeCallback(callback, 'void', ['pointer', 'int', 'pointer']);
 
-    if (unityVersionIsBelow202120.value) {
-        const onWorld = new NativeCallback(() => {}, 'void', []);
-        const state = livenessCalculationBegin.value(klass, 0, chooseCallback, NULL, onWorld, onWorld);
+    const realloc = (handle: NativePointer, size: UInt64) => {
+        if (!handle.isNull() && size.compare(0) == 0) {
+            free.value(handle);
+            return NULL;
+        } else {
+            return alloc.value(size);
+        }
+    };
 
-        livenessCalculationFromStatics.value(state);
-        livenessCalculationEnd.value(state);
-    } else {
-        const realloc = (handle: NativePointer, size: UInt64) => {
-            if (!handle.isNull() && size.compare(0) == 0) {
-                free.value(handle);
-                return NULL;
-            } else {
-                return alloc.value(size);
-            }
-        };
+    const reallocCallback = new NativeCallback(realloc, 'pointer', ['pointer', 'size_t', 'pointer']);
 
-        const reallocCallback = new NativeCallback(realloc, 'pointer', ['pointer', 'size_t', 'pointer']);
+    stopWorld();
 
-        stopWorld();
+    const state = livenessAllocateStruct.value(klass, 0, chooseCallback, NULL, reallocCallback);
+    livenessCalculationFromStatics.value(state);
+    livenessFinalize.value(state);
 
-        const state = livenessAllocateStruct.value(klass, 0, chooseCallback, NULL, reallocCallback);
-        livenessCalculationFromStatics.value(state);
-        livenessFinalize.value(state);
+    startWorld();
 
-        startWorld();
-
-        livenessFreeStruct.value(state);
-    }
+    livenessFreeStruct.value(state);
 
     return matches;
 }
