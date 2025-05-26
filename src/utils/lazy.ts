@@ -20,7 +20,9 @@ export function lazy(_: any, propertyKey: PropertyKey, descriptor: PropertyDescr
     return descriptor;
 }
 
-export function lazyValue<T>(callback: () => T) {
+export type LazyValue<T> = { value: T };
+
+export function lazyValue<T>(callback: () => T): LazyValue<T> {
     const obj = {
         get value(): T {
             let value = callback();
