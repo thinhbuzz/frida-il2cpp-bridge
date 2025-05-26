@@ -17,10 +17,10 @@ import { raise } from '../utils/console';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { Class } from './class';
-import { Field, FieldType } from './field';
+import { BoundField, Field, FieldType } from './field';
 import { GCHandle } from './gc-handle';
 import { corlib } from './image';
-import { Method, MethodReturnType } from './method';
+import { BoundMethod, Method, MethodReturnType } from './method';
 import { Il2CppString } from './string';
 import { ValueType } from './value-type';
 
@@ -32,6 +32,55 @@ export class Il2CppObject extends NativeStruct {
     @lazy
     static get headerSize(): number {
         return corlib.value.class('System.Object').instanceSize;
+    }
+
+    /**
+     * Returns the same object, but having its parent class as class.
+     * It basically is the C# `base` keyword, so that parent members can be
+     * accessed.
+     *
+     * **Example** \
+     * Consider the following classes:
+     * ```csharp
+     * class Foo
+     * {
+     *     int foo()
+     *     {
+     *          return 1;
+     *     }
+     * }
+     * class Bar : Foo
+     * {
+     *     new int foo()
+     *     {
+     *          return 2;
+     *     }
+     * }
+     * ```
+     * then:
+     * ```ts
+     * const Bar: Class = ...;
+     * const bar = Bar.new();
+     *
+     * console.log(bar.foo()); // 2
+     * console.log(bar.base.foo()); // 1
+     * ```
+     */
+    get base(): Il2CppObject {
+        if (this.class.parent == null) {
+            raise(`class ${this.class.type.name} has no parent`);
+        }
+
+        return new Proxy(this, {
+            get(target: Il2CppObject, property: keyof Il2CppObject, receiver: Il2CppObject): any {
+                if (property == "class") {
+                    return Reflect.get(target, property).parent;
+                } else if (property == "base") {
+                    return Reflect.getOwnPropertyDescriptor(Il2CppObject.prototype, property)!.get!.bind(receiver)();
+                }
+                return Reflect.get(target, property);
+            }
+        });
     }
 
     /** Gets the class of this object. */
@@ -51,14 +100,14 @@ export class Il2CppObject extends NativeStruct {
         return objectGetSize.value(this);
     }
 
-    /** Gets the field with the given name. */
-    field<T extends FieldType>(name: string): Field<T> {
-        return this.class.field<T>(name).withHolder(this);
+    /** Gets the non-static field with the given name of the current class hierarchy. */
+    field<T extends FieldType>(name: string): BoundField<T> {
+        return this.tryField(name) ?? raise(`couldn't find non-static field ${name} in hierarchy of class ${this.class.type.name}`);
     }
 
-    /** Gets the method with the given name. */
-    method<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> {
-        return this.class.method<T>(name, parameterCount).withHolder(this);
+    /** Gets the non-static method with the given name (and optionally parameter count) of the current class hierarchy. */
+    method<T extends MethodReturnType>(name: string, parameterCount: number = -1): BoundMethod<T> {
+        return this.tryMethod<T>(name, parameterCount) ?? raise(`couldn't find non-static method ${name} in hierarchy of class ${this.class.type.name}`);
     }
 
     /** Creates a reference to this object. */
@@ -67,23 +116,51 @@ export class Il2CppObject extends NativeStruct {
     }
 
     /** Gets the correct virtual method from the given virtual method. */
-    virtualMethod<T extends MethodReturnType>(method: Method): Method<T> {
-        return new Method<T>(objectGetVirtualMethod.value(this, method)).withHolder(this);
+    virtualMethod<T extends MethodReturnType>(method: Method): BoundMethod<T> {
+        return new Method<T>(objectGetVirtualMethod.value(this, method)).bind(this);
     }
 
-    /** Gets the field with the given name. */
-    tryField<T extends FieldType>(name: string): Field<T> | undefined {
-        return this.class.tryField<T>(name)?.withHolder(this);
+    /** Gets the non-static field with the given name of the current class hierarchy, if it exists. */
+    tryField<T extends FieldType>(name: string): BoundField<T> | undefined {
+        const field = this.class.tryField<T>(name);
+
+        if (field?.isStatic) {
+            // classes cannot have static and non-static fields with the
+            // same name, hence we can immediately check the parent
+            for (const klass of this.class.hierarchy({ includeCurrent: false })) {
+                for (const field of klass.fields) {
+                    if (field.name == name && !field.isStatic) {
+                        return field.bind(this) as Field<T>;
+                    }
+                }
+            }
+            return undefined;
+        }
+
+        return field?.bind(this);
     }
 
-    /** Gets the field with the given name. */
-    tryMethod<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> | undefined {
-        return this.class.tryMethod<T>(name, parameterCount)?.withHolder(this);
+    /** Gets the non-static method with the given name (and optionally parameter count) of the current class hierarchy, if it exists. */
+    tryMethod<T extends MethodReturnType>(name: string, parameterCount: number = -1): BoundMethod<T> | undefined {
+        const method = this.class.tryMethod<T>(name, parameterCount);
+
+        if (method?.isStatic) {
+            for (const klass of this.class.hierarchy()) {
+                for (const method of klass.methods) {
+                    if (method.name == name && !method.isStatic && (parameterCount < 0 || method.parameterCount == parameterCount)) {
+                        return method.bind(this) as BoundMethod<T>;
+                    }
+                }
+            }
+            return undefined;
+        }
+
+        return method?.bind(this);
     }
 
     /** */
     toString(): string {
-        return this.isNull() ? 'null' : this.method<Il2CppString>('ToString', 0).invoke().content ?? 'null';
+        return this.isNull() ? "null" : this.method<Il2CppString>("ToString", 0).invoke().content ?? "null";
     }
 
     /** Unboxes the value type (either a primitive, a struct or an enum) out of this object. */

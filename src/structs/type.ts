@@ -1,4 +1,4 @@
-import { classGetArrayClass, free, typeGetClass, typeGetName, typeGetObject, typeGetTypeEnum } from '../api';
+import { classGetArrayClass, free, typeEquals, typeGetClass, typeGetName, typeGetObject, typeGetTypeEnum } from '../api';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
@@ -155,6 +155,14 @@ export class Type extends NativeStruct {
     @lazy
     get typeEnum(): number {
         return typeGetTypeEnum.value(this);
+    }
+
+    is(other: Type): boolean {
+        if (typeEquals.value.isNull()) {
+            return this.object.method<boolean>('Equals').invoke(other.object);
+        }
+
+        return !!typeEquals.value(this, other);
     }
 
     /** */

@@ -29,18 +29,14 @@ import { forModule } from './utils/native-wait';
  * ```
  */
 export const module = lazyValue(() => {
-    const [moduleName, fallback] = getExpectedModuleNames();
-    return Process.findModuleByName(moduleName) ?? Process.getModuleByName(fallback);
+    return tryModule() ?? raise('Could not find IL2CPP module');
 });
 
 /**
  * Waits for the IL2CPP native library to be loaded and initialized.
  */
 export async function initialize(blocking = false): Promise<boolean> {
-    module.value = Process.platform == 'darwin'
-        ? Process.findModuleByAddress(DebugSymbol.fromName('il2cpp_init').address)
-        ?? await forModule(...getExpectedModuleNames())
-        : await forModule(...getExpectedModuleNames());
+    module.value = tryModule() ?? await forModule(...getExpectedModuleNames());
 
     // At this point, the IL2CPP native library has been loaded, but we
     // cannot interact with IL2CPP until `il2cpp_init` is done.
@@ -58,6 +54,16 @@ export async function initialize(blocking = false): Promise<boolean> {
     }
 
     return false;
+}
+
+export function tryModule(): Module | undefined {
+    const [moduleName, fallback] = getExpectedModuleNames();
+    return (
+        Process.findModuleByName(moduleName) ??
+        Process.findModuleByName(fallback ?? moduleName) ??
+        (Process.platform == 'darwin' ? Process.findModuleByAddress(DebugSymbol.fromName('il2cpp_init').address) : undefined)
+        ?? undefined
+    );
 }
 
 export function getExpectedModuleNames(): string[] {

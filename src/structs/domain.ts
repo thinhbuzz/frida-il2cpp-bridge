@@ -19,7 +19,7 @@ export class Domain extends NativeStruct {
 
         if (handles.length == 0) {
             const assemblyObjects = this.object.method<Il2CppArray<Il2CppObject>>('GetAssemblies').overload().invoke();
-            handles = globalThis.Array.from(assemblyObjects).map(_ => _.field<NativePointer>('_mono_assembly').value);
+            handles = Array.from(assemblyObjects).map(_ => _.field<NativePointer>('_mono_assembly').value);
         }
 
         return handles.map(_ => new Assembly(_));
