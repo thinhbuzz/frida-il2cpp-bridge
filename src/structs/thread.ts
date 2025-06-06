@@ -90,15 +90,15 @@ export class Thread extends NativeStruct {
     }
 
     /** Schedules a callback on the current thread. */
-    schedule<T>(block: () => T): Promise<T> {
-        const Post = this.synchronizationContext?.tryMethod('Post');
+    async schedule<T>(block: () => T | Promise<T>): Promise<T> {
+        const Post = this.synchronizationContext?.tryMethod("Post");
 
         if (Post == null) {
-            return Process.runOnThread(this.id, block);
+            return await Process.runOnThread<T | Promise<T>>(this.id, block);
         }
         let sendOrPostCallback: Il2CppObject | null = null;
 
-        return new Promise(resolve => {
+        return await new Promise<T>(resolve => {
             sendOrPostCallback = delegate(corlib.value.class('System.Threading.SendOrPostCallback'), () => {
                 const result = block();
                 setImmediate(() => resolve(result));
