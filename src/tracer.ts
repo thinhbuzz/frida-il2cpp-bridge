@@ -1,4 +1,3 @@
-import { unityVersionIsBelow201830 } from './application';
 import { fromFridaValue } from './memory';
 import { module } from './module';
 import { Assembly } from './structs/assembly';
@@ -282,7 +281,7 @@ export function trace(parameters: boolean = false): TracerConfigure {
     const applierWithParameters = (): TracerApply => (method, state, threadId) => {
         const paddedVirtualAddress = method.relativeVirtualAddress.toString(16).padStart(8, '0');
 
-        const startIndex = +!method.isStatic | +unityVersionIsBelow201830.value;
+        const startIndex = +!method.isStatic;
 
         const callback = function (this: CallbackContext | InvocationContext, ...args: any[]) {
             if ((this as InvocationContext).threadId == threadId) {

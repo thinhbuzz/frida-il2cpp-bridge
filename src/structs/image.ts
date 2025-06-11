@@ -1,13 +1,10 @@
-import { classFromName, classFromObject, getCorlib, imageGetAssembly, imageGetClass, imageGetClassCount, imageGetName } from '../api';
-import { unityVersionIsBelow201830 } from '../application';
+import { classFromName, getCorlib, imageGetAssembly, imageGetClass, imageGetClassCount, imageGetName } from '../api';
 import { raise } from '../utils/console';
 import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
-import { Il2CppArray } from './array';
 import { Assembly } from './assembly';
 import { Class } from './class';
-import { Il2CppObject } from './object';
 
 @recycle
 export class Image extends NativeStruct {
@@ -20,30 +17,16 @@ export class Image extends NativeStruct {
     /** Gets the amount of classes defined in this image. */
     @lazy
     get classCount(): number {
-        if (unityVersionIsBelow201830.value) {
-            return this.classes.length;
-        } else {
-            return imageGetClassCount.value(this);
-        }
+        return imageGetClassCount.value(this);
     }
 
     /** Gets the classes defined in this image. */
     @lazy
     get classes(): Class[] {
-        if (unityVersionIsBelow201830.value) {
-            const types = this.assembly.object.method<Il2CppArray<Il2CppObject>>('GetTypes').invoke(false);
-            // In Unity 5.3.8f1, getting System.Reflection.Emit.OpCodes type name
-            // without iterating all the classes first somehow blows things up at
-            // app startup, hence the `Array.from`.
-            const classes = globalThis.Array.from(types, _ => new Class(classFromObject.value(_)));
-            classes.unshift(this.class('<Module>'));
-            return classes;
-        } else {
-            return globalThis.Array.from(
-                globalThis.Array(this.classCount),
-                (_, i) => new Class(imageGetClass.value(this, i)),
-            );
-        }
+        return globalThis.Array.from(
+            globalThis.Array(this.classCount),
+            (_, i) => new Class(imageGetClass.value(this, i)),
+        );
     }
 
     /** Gets the name of this image. */
