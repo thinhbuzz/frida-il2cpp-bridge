@@ -16,8 +16,8 @@ importers:
         version: 5.8.3
     devDependencies:
       '@types/frida-gum':
-        specifier: ^18.8.2
-        version: 18.8.2
+        specifier: ^19.0.0
+        version: 19.0.0
       ts-patch:
         specifier: ^3.3.0
         version: 3.3.0
@@ -27,8 +27,8 @@ importers:
 
 packages:
 
-  '@types/frida-gum@18.8.2':
-    resolution: {integrity: sha512-5KH6ITrKJQe1UWrNnbXXx3KXRe/Lx9I1EwkBdC+AMmlo9F5UC0PxdC959aGxhfjXBRIHWxXwXPi3JmeWIbeqeg==}
+  '@types/frida-gum@19.0.0':
+    resolution: {integrity: sha512-qViK1KwvPEAkajwSUv0wpZvZLiX8xO4JFFCh8dfYZfzSyOEfoE0KliCP/nJSKIKG6N3hXnPowrvPufjs5fLKAA==}
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -130,7 +130,7 @@ packages:
 
 snapshots:
 
-  '@types/frida-gum@18.8.2': {}
+  '@types/frida-gum@19.0.0': {}
 
   ansi-regex@5.0.1: {}
 
