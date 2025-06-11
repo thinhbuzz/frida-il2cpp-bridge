@@ -140,7 +140,38 @@ export class Thread extends NativeStruct {
 
 /** Gets the attached threads. */
 export const attachedThreads = lazyValue(() => {
-    return readNativeList(threadGetAttachedThreads.value).map(_ => new Thread(_));
+    try {
+        const attached = threadGetAttachedThreads.value;
+        return readNativeList(attached).map(_ => new Thread(_));
+    } catch (e) {
+        if (!(e as Error)?.name?.includes('Il2CppError')) {
+            throw e;
+        }
+        const currentThreadHandle = currentThread.value?.handle ?? raise('Current thread is not attached to IL2CPP');
+        const pattern = currentThreadHandle.toMatchPattern();
+
+        const threads: Thread[] = [];
+
+        for (const range of Process.enumerateRanges('rw-')) {
+            if (range.file == undefined) {
+                const matches = Memory.scanSync(range.base, range.size, pattern);
+                if (matches.length == 1) {
+                    while (true) {
+                        const handle = matches[0].address.sub(matches[0].size * threads.length).readPointer();
+
+                        if (handle.isNull() || !handle.readPointer().equals(currentThreadHandle.readPointer())) {
+                            break;
+                        }
+
+                        threads.unshift(new Thread(handle));
+                    }
+                    break;
+                }
+            }
+        }
+
+        return threads;
+    }
 });
 
 /** Gets the current attached thread, if any. */
