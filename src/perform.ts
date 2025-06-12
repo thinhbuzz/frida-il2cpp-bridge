@@ -13,7 +13,7 @@ export async function perform<T>(
 ): Promise<T> {
     try {
         if (!initialized) {
-            module.value = await forModule(expectedModuleName);
+            module.patch(await forModule(expectedModuleName));
             await asyncSleep(1000);
             initialized = true;
         }

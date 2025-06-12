@@ -20,27 +20,30 @@ export function lazy(_: any, propertyKey: PropertyKey, descriptor: PropertyDescr
     return descriptor;
 }
 
-export type LazyValue<T> = { value: T };
+export type LazyValue<T> = { readonly value: T, patch: (value: T) => void };
 
 export function lazyValue<T>(callback: () => T): LazyValue<T> {
-    const obj = {
+    return {
         get value(): T {
             let value = callback();
             if (value == null) {
                 return value;
             }
-            Object.defineProperty(obj, 'value', {
+            Object.defineProperty(this, 'value', {
                 value,
-                writable: true,
+                writable: false,
+                configurable: true,
+                enumerable: true,
             });
             return value;
         },
-        set value(value: T) {
-            Object.defineProperty(obj, 'value', {
+        patch(value: T): void {
+            Object.defineProperty(this, 'value', {
                 value,
-                writable: true,
+                writable: false,
+                configurable: true,
+                enumerable: true,
             });
-        },
+        }
     };
-    return obj;
 }
