@@ -10,9 +10,6 @@
     "experimentalDecorators": true,
     "sourceMap": true,
     "strict": true,
-    "stripInternal": true,
-    "plugins": [ 
-      { "transform": "ts-transformer-inline-file/transformer" }
-    ]
+    "stripInternal": true
   }
 }
