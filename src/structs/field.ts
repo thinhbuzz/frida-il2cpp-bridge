@@ -88,16 +88,20 @@ export class Field<T extends FieldType = FieldType> extends NativeStruct {
         return new Type(fieldGetType.value(this));
     }
 
+    getStaticValueHandle() {
+        const handle = Memory.alloc(Process.pointerSize);
+        fieldGetStaticValue.value(this.handle, handle);
+
+        return handle;
+    }
+
     /** Gets the value of this field. */
     get value(): T {
         if (!this.isStatic) {
             raise(`cannot access instance field ${this.class.type.name}::${this.name} from a class, use an object instead`);
         }
 
-        const handle = Memory.alloc(Process.pointerSize);
-        fieldGetStaticValue.value(this.handle, handle);
-
-        return read(handle, this.type) as T;
+        return read(this.getStaticValueHandle(), this.type) as T;
     }
 
     /** Sets the value of this field. Thread static or literal values cannot be altered yet. */
@@ -138,12 +142,16 @@ ${this.isLiteral ? ` = ${this.type.class.isEnum ? read(
 ${this.isThreadStatic || this.isLiteral ? `` : ` // 0x${this.offset.toString(16)}`}`;
     }
 
+    getInstanceValueHandle(instance: Il2CppObject | ValueType) {
+        return instance.handle.add(this.offset - (instance instanceof ValueType ? Il2CppObject.headerSize : 0));
+    }
+
     withHolder(instance: Il2CppObject | ValueType): Field<T> {
         if (this.isStatic) {
             raise(`cannot access static field ${this.class.type.name}::${this.name} from an object, use a class instead`);
         }
 
-        const valueHandle = instance.handle.add(this.offset - (instance instanceof ValueType ? Il2CppObject.headerSize : 0));
+        const valueHandle = this.getInstanceValueHandle(instance);
 
         return new Proxy(this, {
             get(target: Field<T>, property: keyof Field): any {

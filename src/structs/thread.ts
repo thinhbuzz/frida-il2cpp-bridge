@@ -1,12 +1,12 @@
-import { domainGet, threadDetach, threadGetAttachedThreads, threadGetCurrent, threadIsVm } from '../api';
+import { domainGet, threadDetach, threadGetCurrent, threadIsVm } from '../api';
 import { raise } from '../utils/console';
 import { getter } from '../utils/getter';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { offsetOf } from '../utils/offset-of';
-import { readNativeList } from '../utils/read-native-list';
 import { Class } from './class';
 import { cleanupDelegates, delegate } from './delegate';
+import { domain } from './domain';
 import { corlib } from './image';
 import { Il2CppObject } from './object';
 
@@ -138,44 +138,6 @@ export class Thread extends NativeStruct {
     }
 }
 
-/** Gets the attached threads. */
-export const attachedThreads = {
-    get value(): Thread[] {
-        try {
-            const attached = threadGetAttachedThreads.value;
-            return readNativeList(attached).map(_ => new Thread(_));
-        } catch (e) {
-            if (!(e as Error)?.name?.includes('Il2CppError')) {
-                throw e;
-            }
-            const currentThreadHandle = currentThread.value?.handle ?? raise('Current thread is not attached to IL2CPP');
-            const pattern = currentThreadHandle.toMatchPattern();
-
-            const threads: Thread[] = [];
-
-            for (const range of Process.enumerateRanges('rw-')) {
-                if (range.file == undefined) {
-                    const matches = Memory.scanSync(range.base, range.size, pattern);
-                    if (matches.length == 1) {
-                        while (true) {
-                            const handle = matches[0].address.sub(matches[0].size * threads.length).readPointer();
-
-                            if (handle.isNull() || !handle.readPointer().equals(currentThreadHandle.readPointer())) {
-                                break;
-                            }
-
-                            threads.unshift(new Thread(handle));
-                        }
-                        break;
-                    }
-                }
-            }
-
-            return threads;
-        }
-    },
-};
-
 /** Gets the current attached thread, if any. */
 export const currentThread = {
     get value() {
@@ -186,11 +148,12 @@ export const currentThread = {
 /** Gets the current attached thread, if any. */
 export const mainThread = {
     get value() {
-        // I'm not sure if this is always the case. Typically, the main
-        // thread managed id is 1, but this isn't always true: spawning
-        // an Android application with Unity 5.3.8f1 will cause the Frida
-        // thread to have the managed id equal to 1, whereas the main thread
-        // managed id is 2.
-        return attachedThreads.value[0];
+        const MapsAsyncAssembly = domain.value.assembly('Niantic.Lightship.Maps.Async');
+        const MainThread = MapsAsyncAssembly.image.class('Niantic.Lightship.Maps.Async.Internal.MainThread');
+        const mainThread = MainThread.method<Il2CppObject>('get_Instance').invoke();
+        if (mainThread.isNull()) {
+            raise('Main thread not available');
+        }
+        return new Thread(mainThread.field('_thread').getInstanceValueHandle(mainThread).readPointer());
     },
 };
