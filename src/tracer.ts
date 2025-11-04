@@ -270,8 +270,9 @@ export function trace(parameters: boolean = false): TracerConfigure {
             },
             onLeave() {
                 if (this.threadId == threadId) {
+                    const stateValue = state.depth > 0 ? --state.depth : 0;
                     // prettier-ignore
-                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(--state.depth)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`);
+                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(stateValue)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`);
                     state.flush();
                 }
             },
@@ -296,8 +297,9 @@ export function trace(parameters: boolean = false): TracerConfigure {
             const returnValue = method.nativeFunction(...args);
 
             if ((this as InvocationContext).threadId == threadId) {
+                const stateValue = state.depth > 0 ? --state.depth : 0;
                 // prettier-ignore
-                state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(--state.depth)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m${returnValue == undefined ? '' : ` = \x1b[36m${fromFridaValue(
+                state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(stateValue)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m${returnValue == undefined ? '' : ` = \x1b[36m${fromFridaValue(
                     returnValue,
                     method.returnType,
                 )}`}\x1b[0m`);
