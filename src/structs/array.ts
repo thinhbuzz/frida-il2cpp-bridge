@@ -3,7 +3,7 @@ import { raise } from '../utils/console';
 import { getter } from '../utils/getter';
 import { lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
-import { offsetOf } from '../utils/offset-of';
+import { offsetOfPointer } from '../utils/offset-of';
 import { Class } from './class';
 import { FieldType } from './field';
 import { corlib } from './image';
@@ -21,14 +21,10 @@ export class Il2CppArray<T extends FieldType = FieldType> extends NativeStruct i
 
     /** Gets a pointer to the first element of the current array. */
     get elements(): Pointer<T> {
-        // We previosly obtained an array whose content is known by calling
-        // 'System.String::Split(NULL)' on a known string. However, that
-        // method invocation somehow blows things up in Unity 2018.3.0f1.
-        const array = string('v').object.method<Il2CppArray>('ToCharArray', 0).invoke();
+        const s = string('vfsfitvnm');
+        const array = s.object.method<Il2CppObject>('Split', 1).invoke(NULL);
 
-        // prettier-ignore
-        const offset = offsetOf(array.handle, _ => _.readS16() == 118) ??
-            raise('couldn\'t find the elements offset in the native array struct');
+        const offset = offsetOfPointer(array.handle, s.handle);
 
         // prettier-ignore
         getter(Il2CppArray.prototype, 'elements', function (this: Il2CppArray) {
