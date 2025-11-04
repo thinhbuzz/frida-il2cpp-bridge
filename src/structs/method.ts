@@ -213,12 +213,12 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
         } catch (e: any) {
             switch (e.message) {
                 case 'access violation accessing 0x0':
-                    raise(`couldn't set implementation for method ${this.name} as it has a NULL virtual address`);
+                    raise(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has a NULL virtual address`);
                 case /unable to intercept function at \w+; please file a bug/.exec(e.message)?.input:
-                    warn(`couldn't set implementation for method ${this.name} as it may be a thunk`);
+                    warn(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it may be a thunk`);
                     break;
                 case 'already replaced this function':
-                    warn(`couldn't set implementation for method ${this.name} as it has already been replaced by a thunk`);
+                    warn(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has already been replaced by a thunk`);
                     break;
                 default:
                     throw e;
