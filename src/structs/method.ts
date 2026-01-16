@@ -207,7 +207,7 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
     }
 
     /** Replaces the body of this method. */
-    set implementation(block: (this: Class | Il2CppObject | ValueType, ...parameters: P) => T) {
+    set implementation(block: (this: (Class | Il2CppObject | ValueType) & { currentMethod: Method<T, P> }, ...parameters: P) => T) {
         try {
             Interceptor.replace(this.virtualAddress, this.wrap(block));
         } catch (e: any) {
@@ -366,7 +366,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                     case 'overload':
                     case 'tryOverload':
                         return function (...args: any[]) {
-                            return target[property](...args)?.withHolder(instance);
+                            return (target as any)[property](...args)?.withHolder(instance);
                         };
                 }
 
@@ -375,7 +375,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
         });
     }
 
-    wrap(block: (this: Class | Il2CppObject | ValueType, ...parameters: P) => T): NativeCallback<any, any> {
+    wrap(block: (this: (Class | Il2CppObject | ValueType) & { currentMethod: Method<T, P> }, ...parameters: P) => T): NativeCallback<any, any> {
         const startIndex = +!this.isStatic;
         return new NativeCallback(
             (...args: NativeCallbackArgumentValue[]): NativeCallbackReturnValue => {
@@ -387,9 +387,9 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                             this.class.type,
                         )
                         : new Il2CppObject(args[0] as NativePointer);
-                thisObject.currentMethod = (this.isStatic ? this : this.withHolder(thisObject as (Il2CppObject | ValueType))) as unknown as Method<MethodReturnType, ParameterType[]>;
+                (thisObject as any).currentMethod = (this.isStatic ? this : this.withHolder(thisObject as (Il2CppObject | ValueType))) as unknown as Method<MethodReturnType, ParameterType[]>;
                 const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type)) as P;
-                const result = block.call(thisObject, ...parameters);
+                const result = block.call(thisObject as (Class | Il2CppObject | ValueType) & { currentMethod: Method<T, P> }, ...parameters);
                 return toFridaValue(result);
             },
             this.returnType.fridaAlias,
