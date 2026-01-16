@@ -284,8 +284,8 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
     }
 
     /** Gets the overloaded method with the given parameter types. */
-    overload(...parameterTypes: string[]): Method<T> {
-        return this.tryOverload(...parameterTypes) ?? raise(`couldn't find overload for method ${this.name} with parameter types ${parameterTypes.join(
+    overload<U extends MethodReturnType = T, PNew extends ParameterType[] = ParameterType[]>(...parameterTypes: string[]): Method<U, PNew> {
+        return this.tryOverload<U, PNew>(...parameterTypes) ?? raise(`couldn't find overload for method ${this.name} with parameter types ${parameterTypes.join(
             ', ')}`);
     }
 
@@ -301,7 +301,7 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
     }
 
     /** Gets the overloaded method with the given parameter types. */
-    tryOverload<U extends MethodReturnType = T>(...parameterTypes: string[]): Method<U> | undefined {
+    tryOverload<U extends MethodReturnType = T, PNew extends ParameterType[] = ParameterType[]>(...parameterTypes: string[]): Method<U, PNew> | undefined {
         let klass: Class | null = this.class;
         while (klass) {
             const method = klass.methods.find(method => {
@@ -310,7 +310,7 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
                     method.parameterCount == parameterTypes.length &&
                     method.parameters.every((e, i) => e.type.name == parameterTypes[i])
                 );
-            }) as Method<U> | undefined;
+            }) as Method<U, PNew> | undefined;
             if (method) {
                 return method;
             }
