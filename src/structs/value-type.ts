@@ -2,6 +2,7 @@ import { valueTypeBox } from '../api';
 import { NativeStruct } from '../utils/native-struct';
 import { Field, FieldType } from './field';
 import { Method, MethodReturnType } from './method';
+import { ParameterType } from './parameter';
 import { Il2CppObject } from './object';
 import { Il2CppString } from './string';
 import { Type } from './type';
@@ -25,8 +26,8 @@ export class ValueType extends NativeStruct {
     }
 
     /** Gets the method with the given name. */
-    method<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> {
-        return this.type.class.method<T>(name, parameterCount).withHolder(this);
+    method<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> {
+        return this.type.class.method<T, P>(name, parameterCount).withHolder(this);
     }
 
     /** Gets the field with the given name. */
@@ -35,8 +36,8 @@ export class ValueType extends NativeStruct {
     }
 
     /** Gets the field with the given name. */
-    tryMethod<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> | undefined {
-        return this.type.class.tryMethod<T>(name, parameterCount)?.withHolder(this);
+    tryMethod<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> | undefined {
+        return this.type.class.tryMethod<T, P>(name, parameterCount)?.withHolder(this);
     }
 
     /** */
@@ -45,7 +46,7 @@ export class ValueType extends NativeStruct {
         return this.isNull()
             ? 'null'
             : // If ToString is defined within a value type class, we can
-              // avoid a boxing operation.
+            // avoid a boxing operation.
             ToString.class.isValueType
                 ? ToString.invoke().content ?? 'null'
                 : this.box().toString() ?? 'null';

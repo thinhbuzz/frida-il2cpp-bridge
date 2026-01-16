@@ -28,7 +28,7 @@ import { Parameter, ParameterType } from './parameter';
 import { Type } from './type';
 import { ValueType } from './value-type';
 
-export class Method<T extends MethodReturnType = MethodReturnType> extends NativeStruct {
+export class Method<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]> extends NativeStruct {
     /** Gets the class in which this method is defined. */
     @lazy
     get class(): Class {
@@ -207,7 +207,7 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     }
 
     /** Replaces the body of this method. */
-    set implementation(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T) {
+    set implementation(block: (this: Class | Il2CppObject | ValueType, ...parameters: P) => T) {
         try {
             Interceptor.replace(this.virtualAddress, this.wrap(block));
         } catch (e: any) {
@@ -244,14 +244,14 @@ export class Method<T extends MethodReturnType = MethodReturnType> extends Nativ
     }
 
     /** Invokes this method. */
-    invoke(...parameters: ParameterType[]): T {
+    invoke(...parameters: P): T {
         if (!this.isStatic) {
             raise(`cannot invoke non-static method ${this.name} as it must be invoked throught a Object, not a Class`);
         }
         return this.invokeRaw(NULL, ...parameters);
     }
 
-    invokeRaw(instance: NativePointerValue, ...parameters: ParameterType[]): T {
+    invokeRaw(instance: NativePointerValue, ...parameters: P): T {
         const allocatedParameters = parameters.map(toFridaValue);
 
         if (!this.isStatic) {
@@ -334,13 +334,13 @@ ${this.name}\
 ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toString(16).padStart(8, `0`)}`}`;
     }
 
-    withHolder(instance: Il2CppObject | ValueType): Method<T> {
+    withHolder(instance: Il2CppObject | ValueType): Method<T, P> {
         if (this.isStatic) {
             raise(`cannot access static method ${this.class.type.name}::${this.name} from an object, use a class instead`);
         }
 
         return new Proxy(this, {
-            get(target: Method<T>, property: keyof Method<T>): any {
+            get(target: Method<T, P>, property: keyof Method<T, P>): any {
                 switch (property) {
                     case 'invoke':
                         // In Unity 5.3.5f1 and >= 2021.2.0f1, value types
@@ -375,7 +375,7 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
         });
     }
 
-    wrap(block: (this: Class | Il2CppObject | ValueType, ...parameters: ParameterType[]) => T): NativeCallback<any, any> {
+    wrap(block: (this: Class | Il2CppObject | ValueType, ...parameters: P) => T): NativeCallback<any, any> {
         const startIndex = +!this.isStatic;
         return new NativeCallback(
             (...args: NativeCallbackArgumentValue[]): NativeCallbackReturnValue => {
@@ -387,8 +387,8 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                             this.class.type,
                         )
                         : new Il2CppObject(args[0] as NativePointer);
-                thisObject.currentMethod = this.isStatic ? this : this.withHolder(thisObject as (Il2CppObject | ValueType));
-                const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type));
+                thisObject.currentMethod = (this.isStatic ? this : this.withHolder(thisObject as (Il2CppObject | ValueType))) as unknown as Method<MethodReturnType, ParameterType[]>;
+                const parameters = this.parameters.map((_, i) => fromFridaValue(args[i + startIndex], _.type)) as P;
                 const result = block.call(thisObject, ...parameters);
                 return toFridaValue(result);
             },

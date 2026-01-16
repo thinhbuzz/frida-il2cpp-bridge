@@ -21,6 +21,7 @@ import { Field, FieldType } from './field';
 import { GCHandle } from './gc-handle';
 import { corlib } from './image';
 import { Method, MethodReturnType } from './method';
+import { ParameterType } from './parameter';
 import { Il2CppString } from './string';
 import { ValueType } from './value-type';
 
@@ -57,8 +58,8 @@ export class Il2CppObject extends NativeStruct {
     }
 
     /** Gets the method with the given name. */
-    method<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> {
-        return this.class.method<T>(name, parameterCount).withHolder(this);
+    method<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> {
+        return this.class.method<T, P>(name, parameterCount).withHolder(this);
     }
 
     /** Creates a reference to this object. */
@@ -67,8 +68,8 @@ export class Il2CppObject extends NativeStruct {
     }
 
     /** Gets the correct virtual method from the given virtual method. */
-    virtualMethod<T extends MethodReturnType>(method: Method): Method<T> {
-        return new Method<T>(objectGetVirtualMethod.value(this, method)).withHolder(this);
+    virtualMethod<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(method: Method<T, P>): Method<T, P> {
+        return new Method<T, P>(objectGetVirtualMethod.value(this, method)).withHolder(this);
     }
 
     /** Gets the field with the given name. */
@@ -77,8 +78,8 @@ export class Il2CppObject extends NativeStruct {
     }
 
     /** Gets the field with the given name. */
-    tryMethod<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> | undefined {
-        return this.class.tryMethod<T>(name, parameterCount)?.withHolder(this);
+    tryMethod<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> | undefined {
+        return this.class.tryMethod<T, P>(name, parameterCount)?.withHolder(this);
     }
 
     /** */

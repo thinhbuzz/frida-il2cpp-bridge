@@ -48,6 +48,7 @@ import { Field, FieldType } from './field';
 import { corlib, Image } from './image';
 import { Method, MethodReturnType } from './method';
 import { Il2CppObject } from './object';
+import { ParameterType } from './parameter';
 import { Type } from './type';
 
 @recycle
@@ -326,8 +327,8 @@ export class Class extends NativeStruct {
     }
 
     /** Gets the method identified by the given name and parameter count. */
-    method<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> {
-        return this.tryMethod<T>(
+    method<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> {
+        return this.tryMethod<T, P>(
             name,
             parameterCount,
         ) ?? raise(`couldn't find method ${name} in class ${this.type.name}`);
@@ -361,8 +362,8 @@ export class Class extends NativeStruct {
     }
 
     /** Gets the method with the given name and parameter count. */
-    tryMethod<T extends MethodReturnType>(name: string, parameterCount: number = -1): Method<T> | null {
-        return new Method<T>(classGetMethodFromName.value(
+    tryMethod<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> | null {
+        return new Method<T, P>(classGetMethodFromName.value(
             this,
             Memory.allocUtf8String(name),
             parameterCount,
