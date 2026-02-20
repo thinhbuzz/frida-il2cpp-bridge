@@ -202,6 +202,7 @@ export class Class extends NativeStruct {
     }
 
     /** Determines whether the current class is a struct. */
+    @lazy
     get isStruct(): boolean {
         return this.isValueType && !this.isEnum;
     }
@@ -254,7 +255,7 @@ export class Class extends NativeStruct {
         let rank = 0;
         const name = this.name;
 
-        for (let i = this.name.length - 1; i > 0; i--) {
+        for (let i = name.length - 1; i > 0; i--) {
             const c = name[i];
 
             if (c == ']') rank++;

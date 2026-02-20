@@ -81,13 +81,25 @@ export function choose(klass: Class): Il2CppObject[] {
 
     const chooseCallback = new NativeCallback(callback, 'void', ['pointer', 'int', 'pointer']);
 
+    let currentSize = 0;
+
     const realloc = (handle: NativePointer, size: UInt64) => {
         if (!handle.isNull() && size.compare(0) == 0) {
             free.value(handle);
+            currentSize = 0;
             return NULL;
-        } else {
-            return alloc.value(size);
         }
+
+        const newSize = size.toNumber();
+        const newHandle = alloc.value(size);
+
+        if (!handle.isNull() && currentSize > 0) {
+            Memory.copy(newHandle, handle, Math.min(currentSize, newSize));
+            free.value(handle);
+        }
+
+        currentSize = newSize;
+        return newHandle;
     };
 
     const reallocCallback = new NativeCallback(realloc, 'pointer', ['pointer', 'size_t', 'pointer']);

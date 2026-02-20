@@ -204,6 +204,7 @@ export class Tracer {
                         ? filterDomain(this.#domain)
                         : undefined;
 
+        this.#domain = undefined;
         this.#assemblies = undefined;
         this.#classes = undefined;
         this.#methods = undefined;
@@ -328,7 +329,7 @@ export function backtrace(mode?: Backtracer): TracerConfigure {
     }
     methods.sort((a, b) => a.virtualAddress.compare(b.virtualAddress));
 
-    const searchInsert = (target: NativePointer): Method => {
+    const searchInsert = (target: NativePointer): Method | undefined => {
         let left = 0;
         let right = methods.length - 1;
 
@@ -344,8 +345,11 @@ export function backtrace(mode?: Backtracer): TracerConfigure {
                 left = pivot + 1;
             }
         }
-        return methods[right];
+        return right >= 0 ? methods[right] : undefined;
     };
+
+    const moduleBase = module.value.base;
+    const moduleEnd = moduleBase.add(module.value.size);
 
     const applier = (): TracerApply => (method, state, threadId) => {
         Interceptor.attach(method.virtualAddress, function () {
@@ -354,7 +358,7 @@ export function backtrace(mode?: Backtracer): TracerConfigure {
                 handles.unshift(method.virtualAddress);
 
                 for (const handle of handles) {
-                    if (handle.compare(module.value.base) > 0 && handle.compare(module.value.base.add(module.value.size)) < 0) {
+                    if (handle.compare(moduleBase) > 0 && handle.compare(moduleEnd) < 0) {
                         const method = searchInsert(handle);
 
                         if (method) {

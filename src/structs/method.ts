@@ -247,7 +247,7 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
     /** Invokes this method. */
     invoke(...parameters: P): T {
         if (!this.isStatic) {
-            raise(`cannot invoke non-static method ${this.name} as it must be invoked throught a Object, not a Class`);
+            raise(`cannot invoke non-static method ${this.name} as it must be invoked through an Object, not a Class`);
         }
         return this.invokeRaw(NULL, ...parameters);
     }

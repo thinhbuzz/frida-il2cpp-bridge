@@ -29,7 +29,7 @@ export function is<T extends Class | Il2CppObject | Type>(klass: Class): (elemen
 }
 
 /**
- * Creates a filter to include elements whose type can be corresponds to
+ * Creates a filter to include elements whose type corresponds to
  * the given class. \
  * It compares the native handle of the element classes.
  *
