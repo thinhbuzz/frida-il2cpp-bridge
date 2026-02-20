@@ -38,7 +38,7 @@ import {
 } from '../api';
 import { raise } from '../utils/console';
 import { getter } from '../utils/getter';
-import { lazy } from '../utils/lazy';
+import { cachedAllocUtf8String, lazy } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { offsetOf } from '../utils/offset-of';
 import { readNativeIterator } from '../utils/read-native-iterator';
@@ -110,6 +110,12 @@ export class Class extends NativeStruct {
     @lazy
     get fields(): Field[] {
         return readNativeIterator(_ => classGetFields.value(this, _)).map(_ => new Field(_));
+    }
+
+    /** Gets the non-static fields of the current class. */
+    @lazy
+    get instanceFields(): Field[] {
+        return this.fields.filter(_ => !_.isStatic);
     }
 
     /** Gets the flags of the current class. */
@@ -356,14 +362,14 @@ export class Class extends NativeStruct {
 
     /** Gets the field with the given name. */
     tryField<T extends FieldType>(name: string): Field<T> | null {
-        return new Field<T>(classGetFieldFromName.value(this, Memory.allocUtf8String(name))).asNullable();
+        return new Field<T>(classGetFieldFromName.value(this, cachedAllocUtf8String(name))).asNullable();
     }
 
     /** Gets the method with the given name and parameter count. */
     tryMethod<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> | null {
         return new Method<T, P>(classGetMethodFromName.value(
             this,
-            Memory.allocUtf8String(name),
+            cachedAllocUtf8String(name),
             parameterCount,
         )).asNullable();
     }
@@ -375,13 +381,13 @@ export class Class extends NativeStruct {
 
     /** */
     toString(): string {
-        const inherited = [this.parent].concat(this.interfaces);
+        const inherited = [this.parent, ...this.interfaces].filter(Boolean) as Class[];
 
         return `\
 // ${this.assemblyName}
 ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interface` : `class`} \
 ${this.type.name}\
-${inherited ? ` : ${inherited.map(_ => _?.type.name).join(`, `)}` : ``}
+${inherited.length > 0 ? ` : ${inherited.map(_ => _.type.name).join(`, `)}` : ``}
 {
     ${this.fields.join(`\n    `)}
     ${this.methods.join(`\n    `)}

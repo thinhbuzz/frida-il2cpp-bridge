@@ -94,13 +94,14 @@ export function choose(klass: Class): Il2CppObject[] {
 
     stopWorld();
 
-    const state = livenessAllocateStruct.value(klass, 0, chooseCallback, NULL, reallocCallback);
-    livenessCalculationFromStatics.value(state);
-    livenessFinalize.value(state);
-
-    startWorld();
-
-    livenessFreeStruct.value(state);
+    try {
+        const state = livenessAllocateStruct.value(klass, 0, chooseCallback, NULL, reallocCallback);
+        livenessCalculationFromStatics.value(state);
+        livenessFinalize.value(state);
+        livenessFreeStruct.value(state);
+    } finally {
+        startWorld();
+    }
 
     return matches;
 }
@@ -109,7 +110,7 @@ export function choose(klass: Class): Il2CppObject[] {
  * Forces a garbage collection of the specified generation.
  */
 export function collect(generation: 0 | 1 | 2): void {
-    gcCollectNative.value(generation < 0 ? 0 : generation > 2 ? 2 : generation);
+    gcCollectNative.value(generation);
 }
 
 /**

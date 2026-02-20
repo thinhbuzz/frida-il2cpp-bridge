@@ -1,3 +1,14 @@
+export const nativeStringCache = new Map<string, NativePointer>();
+
+export function cachedAllocUtf8String(str: string): NativePointer {
+    let ptr = nativeStringCache.get(str);
+    if (ptr === undefined) {
+        ptr = Memory.allocUtf8String(str);
+        nativeStringCache.set(str, ptr);
+    }
+    return ptr;
+}
+
 export function lazy(_: any, propertyKey: PropertyKey, descriptor: PropertyDescriptor) {
     const getter = descriptor.get;
 

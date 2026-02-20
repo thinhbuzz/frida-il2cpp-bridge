@@ -6,7 +6,7 @@ export function getProperty(name: string): string | undefined {
     if (handle) {
         const __system_property_get = new NativeFunction(handle, 'void', ['pointer', 'pointer']);
 
-        const value = Memory.alloc(92).writePointer(NULL);
+        const value = Memory.alloc(92);
         __system_property_get(Memory.allocUtf8String(name), value);
 
         return value.readCString() ?? undefined;

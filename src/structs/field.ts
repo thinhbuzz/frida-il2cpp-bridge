@@ -94,7 +94,8 @@ export class Field<T extends FieldType = FieldType> extends NativeStruct {
             raise(`cannot access instance field ${this.class.type.name}::${this.name} from a class, use an object instead`);
         }
 
-        const handle = Memory.alloc(Process.pointerSize);
+        const size = this.type.class.isValueType ? Math.max(this.type.class.valueTypeSize, Process.pointerSize) : Process.pointerSize;
+        const handle = Memory.alloc(size);
         fieldGetStaticValue.value(this.handle, handle);
 
         return read(handle, this.type) as T;
