@@ -117,7 +117,7 @@ export function fromFridaValue(
 ): ParameterType | MethodReturnType {
     if (globalThis.Array.isArray(value)) {
         const handle = Memory.alloc(type.class.valueTypeSize);
-        const fields = type.class.fields.filter(_ => !_.isStatic);
+        const fields = type.class.instanceFields;
 
         for (let i = 0; i < fields.length; i++) {
             const convertedValue = fromFridaValue(value[i], fields[i].type);
@@ -165,7 +165,7 @@ export function toFridaValue(value: ParameterType | MethodReturnType): NativeFun
         if (value.type.class.isEnum) {
             return value.field<number | Int64 | UInt64>('value__').value;
         } else {
-            const _ = value.type.class.fields.filter(_ => !_.isStatic).map(_ => toFridaValue(_.withHolder(value).value));
+            const _ = value.type.class.instanceFields.map(_ => toFridaValue(_.withHolder(value).value));
             return _.length == 0 ? [0] : _;
         }
     } else {

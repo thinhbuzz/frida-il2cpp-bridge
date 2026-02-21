@@ -1,6 +1,6 @@
 import { getDataPath, getIdentifier, getVersion } from './application';
 import { domain } from './structs/domain';
-import { inform, ok } from './utils/console';
+import { inform, ok, raise } from './utils/console';
 
 /**
  * Dumps the application, i.e. it creates a dummy `.cs` file that contains
@@ -47,7 +47,8 @@ import { inform, ok } from './utils/console';
 export function dump(fileName?: string, path?: string): void {
     fileName = fileName ?? `${getIdentifier() ?? 'unknown'}_${getVersion() ?? 'unknown'}.cs`;
 
-    const destination = `${path ?? getDataPath()}/${fileName}`;
+    const folder = path ?? getDataPath() ?? raise('couldn\'t determine a writable path for the dump, please provide one explicitly');
+    const destination = `${folder}/${fileName}`;
     const file = new File(destination, 'w');
 
     for (const assembly of domain.value.assemblies) {

@@ -33,7 +33,7 @@ export class ValueType extends NativeStruct {
         return this.type.class.tryField<T>(name)?.withHolder(this);
     }
 
-    /** Gets the field with the given name. */
+    /** Gets the method with the given name. */
     tryMethod<T extends MethodReturnType = MethodReturnType, P extends ParameterType[] = ParameterType[]>(name: string, parameterCount: number = -1): Method<T, P> | undefined {
         return this.type.class.tryMethod<T, P>(name, parameterCount)?.withHolder(this);
     }

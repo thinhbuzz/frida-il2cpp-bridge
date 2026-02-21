@@ -65,7 +65,10 @@ export function reference<T extends FieldType>(value: T, type?: Type): Reference
                     return new Reference<T>(handle.writeFloat(value), type);
                 case Type.enum.double:
                     return new Reference<T>(handle.writeDouble(value), type);
+                default:
+                    raise(`couldn't create a reference to ${value} using an unhandled number type ${type?.name}`);
             }
+        // falls through
         case 'object':
             if (value instanceof ValueType || value instanceof Pointer) {
                 return new Reference<T>(value.handle, value.type);

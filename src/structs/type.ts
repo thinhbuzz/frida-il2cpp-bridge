@@ -50,7 +50,7 @@ export class Type extends NativeStruct {
     @lazy
     get fridaAlias(): NativeCallbackArgumentType {
         function getValueTypeFields(type: Type): NativeCallbackArgumentType {
-            const instanceFields = type.class.fields.filter(_ => !_.isStatic);
+            const instanceFields = type.class.instanceFields;
             return instanceFields.length == 0 ? ['char'] : instanceFields.map(_ => _.type.fridaAlias);
         }
 
@@ -93,11 +93,12 @@ export class Type extends NativeStruct {
             case Type.enum.multidimensionalArray:
                 return 'pointer';
             case Type.enum.valueType:
-                return this.class.isEnum ? this.class.baseType!.fridaAlias : getValueTypeFields(this);
             case Type.enum.class:
             case Type.enum.object:
             case Type.enum.genericInstance:
-                return this.class.isStruct ? getValueTypeFields(this) : this.class.isEnum ? this.class.baseType!.fridaAlias : 'pointer';
+                if (this.class.isEnum) return this.class.baseType!.fridaAlias;
+                if (this.class.isValueType) return getValueTypeFields(this);
+                return 'pointer';
             default:
                 return 'pointer';
         }
