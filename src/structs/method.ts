@@ -35,19 +35,23 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
         return new Class(methodGetClass.value(this));
     }
 
+    @lazy
+    private get _flagsPair(): { flags: number; implementationFlags: number } {
+        const implFlagsPtr = Memory.alloc(Process.pointerSize);
+        const flags = methodGetFlags.value(this, implFlagsPtr);
+        return { flags, implementationFlags: implFlagsPtr.readU32() };
+    }
+
     /** Gets the flags of the current method. */
     @lazy
     get flags(): number {
-        return methodGetFlags.value(this, NULL);
+        return this._flagsPair.flags;
     }
 
     /** Gets the implementation flags of the current method. */
     @lazy
     get implementationFlags(): number {
-        const implementationFlagsPointer = Memory.alloc(Process.pointerSize);
-        methodGetFlags.value(this, implementationFlagsPointer);
-
-        return implementationFlagsPointer.readU32();
+        return this._flagsPair.implementationFlags;
     }
 
     /** */
@@ -211,17 +215,14 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
         try {
             Interceptor.replace(this.virtualAddress, this.wrap(block));
         } catch (e: any) {
-            switch (e.message) {
-                case 'access violation accessing 0x0':
-                    raise(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has a NULL virtual address`);
-                case /unable to intercept function at \w+; please file a bug/.exec(e.message)?.input:
-                    warn(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it may be a thunk`);
-                    break;
-                case 'already replaced this function':
-                    warn(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has already been replaced by a thunk`);
-                    break;
-                default:
-                    throw e;
+            if (e.message === 'access violation accessing 0x0') {
+                raise(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has a NULL virtual address`);
+            } else if (/unable to intercept function at \w+; please file a bug/.test(e.message)) {
+                warn(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it may be a thunk`);
+            } else if (e.message === 'already replaced this function') {
+                warn(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has already been replaced by a thunk`);
+            } else {
+                throw e;
             }
         }
     }
@@ -246,7 +247,7 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
     /** Invokes this method. */
     invoke(...parameters: P): T {
         if (!this.isStatic) {
-            raise(`cannot invoke non-static method ${this.name} as it must be invoked throught a Object, not a Class`);
+            raise(`cannot invoke non-static method ${this.name} as it must be invoked through an Object, not a Class`);
         }
         return this.invokeRaw(NULL, ...parameters);
     }

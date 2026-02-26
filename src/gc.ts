@@ -81,26 +81,39 @@ export function choose(klass: Class): Il2CppObject[] {
 
     const chooseCallback = new NativeCallback(callback, 'void', ['pointer', 'int', 'pointer']);
 
+    let currentSize = 0;
+
     const realloc = (handle: NativePointer, size: UInt64) => {
         if (!handle.isNull() && size.compare(0) == 0) {
             free.value(handle);
+            currentSize = 0;
             return NULL;
-        } else {
-            return alloc.value(size);
         }
+
+        const newSize = size.toNumber();
+        const newHandle = alloc.value(size);
+
+        if (!handle.isNull() && currentSize > 0) {
+            Memory.copy(newHandle, handle, Math.min(currentSize, newSize));
+            free.value(handle);
+        }
+
+        currentSize = newSize;
+        return newHandle;
     };
 
     const reallocCallback = new NativeCallback(realloc, 'pointer', ['pointer', 'size_t', 'pointer']);
 
     stopWorld();
 
-    const state = livenessAllocateStruct.value(klass, 0, chooseCallback, NULL, reallocCallback);
-    livenessCalculationFromStatics.value(state);
-    livenessFinalize.value(state);
-
-    startWorld();
-
-    livenessFreeStruct.value(state);
+    try {
+        const state = livenessAllocateStruct.value(klass, 0, chooseCallback, NULL, reallocCallback);
+        livenessCalculationFromStatics.value(state);
+        livenessFinalize.value(state);
+        livenessFreeStruct.value(state);
+    } finally {
+        startWorld();
+    }
 
     return matches;
 }
@@ -109,7 +122,7 @@ export function choose(klass: Class): Il2CppObject[] {
  * Forces a garbage collection of the specified generation.
  */
 export function collect(generation: 0 | 1 | 2): void {
-    gcCollectNative.value(generation < 0 ? 0 : generation > 2 ? 2 : generation);
+    gcCollectNative.value(generation);
 }
 
 /**

@@ -89,7 +89,8 @@ export class Field<T extends FieldType = FieldType> extends NativeStruct {
     }
 
     getStaticValueHandle() {
-        const handle = Memory.alloc(Process.pointerSize);
+        const size = this.type.class.isValueType ? Math.max(this.type.class.valueTypeSize, Process.pointerSize) : Process.pointerSize;
+        const handle = Memory.alloc(size);
         fieldGetStaticValue.value(this.handle, handle);
 
         return handle;

@@ -10,12 +10,13 @@ export function offsetOf(handle: NativePointer, condition: (handle: NativePointe
     return null;
 }
 
-export function offsetOfPointer(handle: NativePointer, value: NativePointer): number {
-    for (let i = 0; i < 512; i++) {
+export function offsetOfPointer(handle: NativePointer, value: NativePointer): number | null {
+    const step = Process.pointerSize;
+    for (let i = 0; i < 512; i += step) {
         if (handle.add(i).readPointer().equals(value)) {
             return i;
         }
     }
-    return -1;
+    return null;
 }
 

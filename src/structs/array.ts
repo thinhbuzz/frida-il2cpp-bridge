@@ -24,7 +24,8 @@ export class Il2CppArray<T extends FieldType = FieldType> extends NativeStruct i
         const s = string('vfsfitvnm');
         const array = s.object.method<Il2CppObject>('Split', 1).invoke(NULL);
 
-        const offset = offsetOfPointer(array.handle, s.handle);
+        const offset = offsetOfPointer(array.handle, s.handle)
+            ?? raise('couldn\'t find the elements offset in the native array struct');
 
         // prettier-ignore
         getter(Il2CppArray.prototype, 'elements', function (this: Il2CppArray) {

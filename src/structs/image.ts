@@ -1,6 +1,6 @@
 import { classFromName, getCorlib, imageGetAssembly, imageGetClass, imageGetClassCount, imageGetName } from '../api';
 import { raise } from '../utils/console';
-import { lazy, lazyValue } from '../utils/lazy';
+import { cachedAllocUtf8String, lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { recycle } from '../utils/recycle';
 import { Assembly } from './assembly';
@@ -43,8 +43,8 @@ export class Image extends NativeStruct {
     /** Gets the class with the specified name defined in this image. */
     tryClass(name: string): Class | null {
         const dotIndex = name.lastIndexOf('.');
-        const classNamespace = Memory.allocUtf8String(dotIndex == -1 ? '' : name.slice(0, dotIndex));
-        const className = Memory.allocUtf8String(name.slice(dotIndex + 1));
+        const classNamespace = cachedAllocUtf8String(dotIndex == -1 ? '' : name.slice(0, dotIndex));
+        const className = cachedAllocUtf8String(name.slice(dotIndex + 1));
 
         return new Class(classFromName.value(this, classNamespace, className)).asNullable();
     }

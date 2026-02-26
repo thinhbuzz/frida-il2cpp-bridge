@@ -16,9 +16,10 @@ export class Pointer<T extends FieldType = FieldType> extends NativeStruct {
     /** Reads the given amount of elements starting at the given offset. */
     read(length: number, offset: number = 0): T[] {
         const values = new Array<T>(length);
+        const elementSize = this.type.class.arrayElementSize;
 
         for (let i = 0; i < length; i++) {
-            values[i] = this.get(i + offset);
+            values[i] = read(this.handle.add((i + offset) * elementSize), this.type) as T;
         }
 
         return values;
@@ -36,8 +37,10 @@ export class Pointer<T extends FieldType = FieldType> extends NativeStruct {
 
     /** Writes the given elements starting at the given index. */
     write(values: T[], offset: number = 0): void {
+        const elementSize = this.type.class.arrayElementSize;
+
         for (let i = 0; i < values.length; i++) {
-            this.set(i + offset, values[i]);
+            write(this.handle.add((i + offset) * elementSize), values[i], this.type);
         }
     }
 }

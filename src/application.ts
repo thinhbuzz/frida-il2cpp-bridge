@@ -90,7 +90,9 @@ export const unityVersion = lazyValue(() => {
 
     for (const range of module.value.enumerateRanges('r--').concat(Process.getRangeByAddress(module.value.base))) {
         for (let { address } of Memory.scanSync(range.base, range.size, searchPattern)) {
-            while (address.readU8() != 0) {
+            const lowerBound = range.base;
+            let steps = 0;
+            while (address.compare(lowerBound) > 0 && address.readU8() != 0 && steps++ < 256) {
                 address = address.sub(1);
             }
             const match = UnityVersion.find(address.add(1).readCString());

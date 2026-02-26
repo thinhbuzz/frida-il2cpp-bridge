@@ -1,6 +1,6 @@
 import { domainGet, domainGetAssemblies, domainGetAssemblyFromName, threadAttach } from '../api';
 import { raise } from '../utils/console';
-import { lazy, lazyValue } from '../utils/lazy';
+import { cachedAllocUtf8String, lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
 import { readNativeList } from '../utils/read-native-list';
 import { recycle } from '../utils/recycle';
@@ -43,7 +43,7 @@ export class Domain extends NativeStruct {
 
     /** Opens and loads the assembly with the given name. */
     tryAssembly(name: string): Assembly | null {
-        return new Assembly(domainGetAssemblyFromName.value(this, Memory.allocUtf8String(name))).asNullable();
+        return new Assembly(domainGetAssemblyFromName.value(this, cachedAllocUtf8String(name))).asNullable();
     }
 }
 

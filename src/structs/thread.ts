@@ -35,7 +35,7 @@ export class Thread extends NativeStruct {
         return this.id;
     }
 
-    /** Gets the encompassing internal object (System.Threding.InternalThreead) of the current thread. */
+    /** Gets the encompassing internal object (System.Threading.InternalThread) of the current thread. */
     @lazy
     get internal(): Il2CppObject {
         return this.object.tryField<Il2CppObject>('internal_thread')?.value ?? this.object;
@@ -145,7 +145,7 @@ export const currentThread = {
     },
 };
 
-/** Gets the current attached thread, if any. */
+/** Gets the main thread. */
 export const mainThread = {
     get value() {
         const MapsAsyncAssembly = domain.value.assembly('Niantic.Lightship.Maps.Async');

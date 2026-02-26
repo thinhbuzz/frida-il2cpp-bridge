@@ -42,7 +42,9 @@ export class MemorySnapshot extends NativeStruct {
 /** */
 export function memorySnapshot<T>(block: (memorySnapshot: Omit<MemorySnapshot, 'free'>) => T): T {
     const memorySnapshot = MemorySnapshot.capture();
-    const result = block(memorySnapshot);
-    memorySnapshot.free();
-    return result;
+    try {
+        return block(memorySnapshot);
+    } finally {
+        memorySnapshot.free();
+    }
 }

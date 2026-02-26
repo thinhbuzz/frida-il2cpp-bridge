@@ -204,6 +204,7 @@ export class Tracer {
                         ? filterDomain(this.#domain)
                         : undefined;
 
+        this.#domain = undefined;
         this.#assemblies = undefined;
         this.#classes = undefined;
         this.#methods = undefined;
@@ -222,12 +223,9 @@ export class Tracer {
                 try {
                     this.#applier(target, this.#state, this.#threadId);
                 } catch (e: any) {
-                    switch (e.message) {
-                        case /unable to intercept function at \w+; please file a bug/.exec(e.message)?.input:
-                        case 'already replaced this function':
-                            break;
-                        default:
-                            throw e;
+                    if (e.message !== 'already replaced this function' &&
+                        !/unable to intercept function at \w+; please file a bug/.test(e.message)) {
+                        throw e;
                     }
                 }
             }
@@ -259,20 +257,20 @@ export type TracerApply = (method: Method, state: TracerState, threadId: number)
 /** */
 export function trace(parameters: boolean = false): TracerConfigure {
     const applier = (): TracerApply => (method, state, threadId) => {
-        const paddedVirtualAddress = method.relativeVirtualAddress.toString(16).padStart(8, '0');
+        const prefix = `\x1b[2m0x${method.relativeVirtualAddress.toString(16).padStart(8, '0')}\x1b[0m `;
+        const enterSuffix = `┌─\x1b[35m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`;
+        const leaveSuffix = `└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`;
 
         Interceptor.attach(method.virtualAddress, {
             onEnter() {
                 if (this.threadId == threadId) {
-                    // prettier-ignore
-                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(state.depth++)}┌─\x1b[35m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`);
+                    state.buffer.push(`${prefix}${`│ `.repeat(state.depth++)}${enterSuffix}`);
                 }
             },
             onLeave() {
                 if (this.threadId == threadId) {
                     const stateValue = state.depth > 0 ? --state.depth : 0;
-                    // prettier-ignore
-                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(stateValue)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`);
+                    state.buffer.push(`${prefix}${`│ `.repeat(stateValue)}${leaveSuffix}`);
                     state.flush();
                 }
             },
@@ -319,11 +317,19 @@ export function trace(parameters: boolean = false): TracerConfigure {
 
 /** */
 export function backtrace(mode?: Backtracer): TracerConfigure {
-    const methods = domain.value.assemblies
-        .flatMap(_ => _.image.classes.flatMap(_ => _.methods.filter(_ => !_.virtualAddress.isNull())))
-        .sort((_, __) => _.virtualAddress.compare(__.virtualAddress));
+    const methods: Method[] = [];
+    for (const assembly of domain.value.assemblies) {
+        for (const klass of assembly.image.classes) {
+            for (const method of klass.methods) {
+                if (!method.virtualAddress.isNull()) {
+                    methods.push(method);
+                }
+            }
+        }
+    }
+    methods.sort((a, b) => a.virtualAddress.compare(b.virtualAddress));
 
-    const searchInsert = (target: NativePointer): Method => {
+    const searchInsert = (target: NativePointer): Method | undefined => {
         let left = 0;
         let right = methods.length - 1;
 
@@ -339,8 +345,11 @@ export function backtrace(mode?: Backtracer): TracerConfigure {
                 left = pivot + 1;
             }
         }
-        return methods[right];
+        return right >= 0 ? methods[right] : undefined;
     };
+
+    const moduleBase = module.value.base;
+    const moduleEnd = moduleBase.add(module.value.size);
 
     const applier = (): TracerApply => (method, state, threadId) => {
         Interceptor.attach(method.virtualAddress, function () {
@@ -349,7 +358,7 @@ export function backtrace(mode?: Backtracer): TracerConfigure {
                 handles.unshift(method.virtualAddress);
 
                 for (const handle of handles) {
-                    if (handle.compare(module.value.base) > 0 && handle.compare(module.value.base.add(module.value.size)) < 0) {
+                    if (handle.compare(moduleBase) > 0 && handle.compare(moduleEnd) < 0) {
                         const method = searchInsert(handle);
 
                         if (method) {
