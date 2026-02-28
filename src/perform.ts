@@ -29,18 +29,6 @@ export async function perform<T>(
 
         const result = block();
 
-        if (result instanceof Promise) {
-            return await result.finally(() => {
-                if (isForeignThread) {
-                    if (flag == 'free') {
-                        thread!.detach();
-                    } else if (flag == 'bind') {
-                        Script.bindWeak(globalThis, () => thread!.detach());
-                    }
-                }
-            });
-        }
-
         if (isForeignThread) {
             if (flag == 'free') {
                 thread.detach();
@@ -49,7 +37,7 @@ export async function perform<T>(
             }
         }
 
-        return result;
+        return result instanceof Promise ? await result : result;
     } catch (error: any) {
         Script.nextTick(_ => {
             throw _;
