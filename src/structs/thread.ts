@@ -1,4 +1,4 @@
-import { domainGet, threadDetach, threadGetCurrent, threadIsVm } from '../api';
+import { domainGet, monoThreadGetMain, threadDetach, threadGetCurrent, threadIsVm } from '../api';
 import { raise } from '../utils/console';
 import { getter } from '../utils/getter';
 import { lazy } from '../utils/lazy';
@@ -148,12 +148,16 @@ export const currentThread = {
 /** Gets the main thread. */
 export const mainThread = {
     get value() {
-        const MapsAsyncAssembly = domain.value.assembly('Niantic.Lightship.Maps.Async');
-        const MainThread = MapsAsyncAssembly.image.class('Niantic.Lightship.Maps.Async.Internal.MainThread');
-        const mainThread = MainThread.method<Il2CppObject>('get_Instance').invoke();
-        if (mainThread.isNull()) {
-            raise('Main thread not available');
+        const monoMainThread = monoThreadGetMain.value();
+        if (monoMainThread.isNull()) {
+            const MapsAsyncAssembly = domain.value.assembly('Niantic.Lightship.Maps.Async');
+            const MainThread = MapsAsyncAssembly.image.class('Niantic.Lightship.Maps.Async.Internal.MainThread');
+            const mainThread = MainThread.method<Il2CppObject>('get_Instance').invoke();
+            if (mainThread.isNull()) {
+                raise('Main thread not available');
+            }
+            return new Thread(mainThread.field('_thread').getInstanceValueHandle(mainThread).readPointer());
         }
-        return new Thread(mainThread.field('_thread').getInstanceValueHandle(mainThread).readPointer());
+        return new Thread(monoMainThread);
     },
 };
