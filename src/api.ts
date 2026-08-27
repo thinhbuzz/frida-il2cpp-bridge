@@ -316,6 +316,7 @@ export const threadAttach = lazyNativeValue('il2cpp_thread_attach', 'pointer', [
 
 export const threadDetach = lazyNativeValue('il2cpp_thread_detach', 'void', ['pointer']);
 
+export const monoThreadGetMain = lazyNativeValue('mono_thread_get_main', 'pointer', []);
 
 export const threadGetCurrent = lazyNativeValue('il2cpp_thread_current', 'pointer', []);
 
