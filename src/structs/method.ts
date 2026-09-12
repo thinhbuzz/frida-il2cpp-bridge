@@ -25,6 +25,12 @@ import { protectManagedStack } from '../utils/art-managed-stack';
  */
 const protectManagedStackEnabled = false;
 import { raise, warn } from '../utils/console';
+
+/**
+ * What to do when a reference parameter of an invocation is NULL:
+ * `ignore` (default), `report` (log it), or `raise` (refuse the call).
+ */
+const nullArgumentPolicy: 'ignore' | 'report' | 'raise' = 'ignore';
 import { getter } from '../utils/getter';
 import { lazy, lazyValue } from '../utils/lazy';
 import { NativeStruct } from '../utils/native-struct';
@@ -230,6 +236,12 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
         return this.virtualAddress;
     }
 
+    /**
+     * What to do when a reference parameter of an invocation of this method is
+     * NULL.  `null` follows the global default.
+     */
+    nullArguments: 'ignore' | 'report' | 'raise' | null = null;
+
     /** Replaces the body of this method. */
     set implementation(block: (this: (Class | Il2CppObject | ValueType) & { currentMethod: Method<T, P> }, ...parameters: P) => T) {
         if (this.virtualAddress.isNull()) {
@@ -297,6 +309,63 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
          * was there before the call, so the next stack walk or GC does not
          * follow a pointer into memory that has been recycled since.
          */
+        /*
+         * Naming the parameter that is null turns an unrecoverable fault inside
+         * the callee - which also leaves the runtime with frames that were
+         * never popped - into an ordinary error the caller can catch.  A
+         * reference parameter that is null is almost always a mistake on the
+         * calling side, and the callee dereferences it immediately.
+         */
+        const declared = this.parameters;
+        if (parameters.length === declared.length) {
+            for (let i = 0; i !== declared.length; i++) {
+                let skip: boolean;
+                try {
+                    const type = declared[i].type;
+                    const name = type.name;
+                    /*
+                     * Strings and arrays are handed null on purpose all the
+                     * time (Split(null) splits on whitespace, for instance),
+                     * so only real objects are checked: those are the ones a
+                     * callee dereferences straight away.
+                     */
+                    skip =
+                        type.isPrimitive ||
+                        type.isByReference ||
+                        type.class.isValueType ||
+                        type.class.isEnum ||
+                        name === 'System.String' ||
+                        name.endsWith('[]');
+                } catch (e) {
+                    /* A generic or otherwise unresolved type: nothing to check. */
+                    skip = true;
+                }
+                if (skip) {
+                    continue;
+                }
+
+                const pointer = argumentPointer(parameters[i]);
+                if (pointer !== null && pointer.isNull()) {
+                    const message =
+                        `method ${this.class.fullName}::${this.name} was invoked with a NULL ` +
+                        `parameter ${i} (${declared[i].name}: ${declared[i].type.name})`;
+
+                    /*
+                     * Null reference arguments are legitimate all over .NET and
+                     * Unity (Split(null), Post(callback, null)), so refusing
+                     * them breaks far more calls than it saves. Reporting them
+                     * is what tells us which invocation precedes a fault.
+                     */
+                    const policy = this.nullArguments ?? nullArgumentPolicy;
+                    if (policy === 'raise') {
+                        raise(`couldn't invoke ${message}`);
+                    } else if (policy === 'report') {
+                        warn(message);
+                    }
+                }
+            }
+        }
+
         const restoreManagedStack = protectManagedStackEnabled ? protectManagedStack() : null;
 
         try {
@@ -418,6 +487,10 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
                         };
                 }
 
+                if (property === 'nullArguments') {
+                    return (target as any).nullArguments;
+                }
+
                 return Reflect.get(target, property);
             },
         });
@@ -444,6 +517,29 @@ ${this.virtualAddress.isNull() ? `` : ` // 0x${this.relativeVirtualAddress.toStr
             this.fridaSignature,
         );
     }
+}
+
+/**
+ * Extracts the pointer a call argument was built from, when it carries one.
+ * Reference parameters are handed to native code as they are, so a null one is
+ * a null `this`/argument as far as the callee is concerned, and the callee
+ * usually dereferences it right away.
+ */
+function argumentPointer (value: any): NativePointer | null {
+    if (value === null || value === undefined) {
+        return NULL;
+    }
+
+    if (value instanceof NativePointer) {
+        return value;
+    }
+
+    const handle = (value as any)?.handle;
+    if (handle instanceof NativePointer) {
+        return handle;
+    }
+
+    return null;
 }
 
 export const maybeObjectHeaderSize = lazyValue((): number => {
