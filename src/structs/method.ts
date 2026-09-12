@@ -15,6 +15,7 @@ import {
 import { fromFridaValue, toFridaValue } from '../memory';
 import { module } from '../module';
 import { protectManagedStack } from '../utils/art-managed-stack';
+import { beginGuardedInvocation, endGuardedInvocation } from '../utils/fault-guard';
 
 /*
  * Restoring the chain link only (not the quick frame or the shadow chain) was
@@ -172,7 +173,15 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
             raise(`couldn't invoke method ${this.class.fullName}::${this.name} as it has a NULL virtual address`);
         }
 
-        return new NativeFunction(virtualAddress, this.returnType.fridaAlias, this.fridaSignature as NativeFunctionArgumentType[]);
+        /*
+         * `exceptions: 'propagate'` hands a fault to the process-wide handler
+         * instead of Frida's own error path, which is what lets the guard step
+         * over it and keep the native frames - and therefore ART's own stack
+         * bookkeeping - intact.
+         */
+        return new NativeFunction(virtualAddress, this.returnType.fridaAlias, this.fridaSignature as NativeFunctionArgumentType[], {
+            exceptions: 'propagate',
+        });
     }
 
     /** Gets the encompassing object of the current method. */
@@ -383,6 +392,7 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
 
         const restoreManagedStack = protectManagedStackEnabled ? protectManagedStack() : null;
 
+        beginGuardedInvocation();
         try {
             const returnValue = this.nativeFunction(...allocatedParameters);
             return fromFridaValue(returnValue, this.returnType) as T;
@@ -412,6 +422,8 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
             }
 
             throw e;
+        } finally {
+            endGuardedInvocation();
         }
     }
 
