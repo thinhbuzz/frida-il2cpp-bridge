@@ -316,6 +316,21 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
          * reference parameter that is null is almost always a mistake on the
          * calling side, and the callee dereferences it immediately.
          */
+        /*
+         * A static method invoked through a raw native call does not get the
+         * class initialization the runtime would normally perform on first
+         * access, so its statics can still be null when it dereferences them -
+         * which is what faults early during startup. Asking the runtime to
+         * initialize the declaring class first is cheap when it already did.
+         */
+        if (this.isStatic) {
+            try {
+                this.class.initialize();
+            } catch (e) {
+                /* Not initializable (generic or unresolved): let the call happen. */
+            }
+        }
+
         const declared = this.parameters;
         if (parameters.length === declared.length) {
             for (let i = 0; i !== declared.length; i++) {
