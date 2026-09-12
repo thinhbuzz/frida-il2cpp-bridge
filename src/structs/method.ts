@@ -15,6 +15,17 @@ import {
 import { fromFridaValue, toFridaValue } from '../memory';
 import { module } from '../module';
 import { protectManagedStack } from '../utils/art-managed-stack';
+
+/*
+ * Restoring the managed stack of the calling thread after a native fault was
+ * tried and disabled: it helped on the Pixel (two of three runs survived the
+ * full ten minutes), but on the S21 Ultra it introduced an abort
+ * ("Transitioning to Runnable with checkpoint flag") and a stack-walk crash in
+ * two of four runs, where the same build without it had passed three in a row.
+ * The checks that refuse a NULL method pointer or a NULL instance stay on: they
+ * cannot corrupt anything, they only turn a fatal fault into a JS error.
+ */
+const protectManagedStackEnabled = false;
 import { raise, warn } from '../utils/console';
 import { getter } from '../utils/getter';
 import { lazy, lazyValue } from '../utils/lazy';
@@ -288,13 +299,23 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
          * was there before the call, so the next stack walk or GC does not
          * follow a pointer into memory that has been recycled since.
          */
-        const restoreManagedStack = protectManagedStack();
+        const restoreManagedStack = protectManagedStackEnabled ? protectManagedStack() : null;
 
         try {
             const returnValue = this.nativeFunction(...allocatedParameters);
             return fromFridaValue(returnValue, this.returnType) as T;
         } catch (e: any) {
-            restoreManagedStack?.();
+            /*
+             * Only a native fault abandons the frames the managed stack still
+             * refers to. An ordinary error travels back through those frames
+             * and leaves the bookkeeping correct - and the frames may even
+             * still be live, because JavaScript can be re-entered from them -
+             * so putting the captured state back there would drop a chain that
+             * is still in use and wedge the thread.
+             */
+            if (e?.message?.includes('access violation')) {
+                restoreManagedStack?.();
+            }
             if (e == null) {
                 raise('an unexpected native invocation exception occurred, this is due to parameter types mismatch');
             }
