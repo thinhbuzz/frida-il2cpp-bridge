@@ -18,8 +18,6 @@ const suspendTriggerOffset = 0xc0;
 const stackBeginOffset = 0xf0;
 const stackSizeOffset = 0xf8;
 const linkOffset = 8;
-const topQuickFrameOffset = 0;
-const topShadowFrameOffset = 16;
 
 let getArtThread: (() => NativePointer) | null | undefined;
 
@@ -124,22 +122,20 @@ export function protectManagedStack(): (() => void) | null {
 
     const bounds = getStackBounds(thread)!;
     const head = thread.add(managedStackOffset);
-    const taggedTopQuickFrame = head.add(topQuickFrameOffset).readPointer();
     const link = head.add(linkOffset).readPointer();
-    const topShadowFrame = head.add(topShadowFrameOffset).readPointer();
 
     /*
-     * Only touch the head the runtime itself would have restored: it must not
-     * refer to a fragment outside the thread's own stack, and it must not hold
-     * anything that looks like an ArtMethod pointer (those never live there).
+     * Only touch what the fault can have invalidated: the chain of fragments
+     * that the abandoned frames introduced. The quick frame and the shadow
+     * chain belong to code that can still be running (JavaScript is re-entered
+     * from Java and back), so they are left exactly as they are - restoring
+     * them was measured to wedge the S21 Ultra.
      */
     if (!link.isNull() && !isStackAddress(bounds, link)) {
         return null;
     }
 
     return () => {
-        head.add(topQuickFrameOffset).writePointer(taggedTopQuickFrame);
         head.add(linkOffset).writePointer(link);
-        head.add(topShadowFrameOffset).writePointer(topShadowFrame);
     };
 }

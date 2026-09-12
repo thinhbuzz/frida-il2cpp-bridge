@@ -17,13 +17,11 @@ import { module } from '../module';
 import { protectManagedStack } from '../utils/art-managed-stack';
 
 /*
- * Restoring the managed stack of the calling thread after a native fault was
- * tried and disabled: it helped on the Pixel (two of three runs survived the
- * full ten minutes), but on the S21 Ultra it introduced an abort
- * ("Transitioning to Runnable with checkpoint flag") and a stack-walk crash in
- * two of four runs, where the same build without it had passed three in a row.
- * The checks that refuse a NULL method pointer or a NULL instance stay on: they
- * cannot corrupt anything, they only turn a fatal fault into a JS error.
+ * Restoring the chain link only (not the quick frame or the shadow chain) was
+ * measured as well: the S21 Ultra passed one run of three with it and three of
+ * three without it, so nothing is written here at all. What is left are the
+ * checks that refuse a NULL method pointer or a NULL instance, which only turn
+ * a fatal fault into a JavaScript error.
  */
 const protectManagedStackEnabled = false;
 import { raise, warn } from '../utils/console';
