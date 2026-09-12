@@ -142,11 +142,21 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
 
     @lazy
     get nativeFunction(): NativeFunction<any, any> {
-        return new NativeFunction(
-            this.virtualAddress,
-            this.returnType.fridaAlias,
-            this.fridaSignature as NativeFunctionArgumentType[],
-        );
+        const virtualAddress = this.virtualAddress;
+
+        /*
+         * A method whose native pointer has not been resolved yet - a generic
+         * method that was never inflated, for instance - would fault on the
+         * first call, and that fault is fatal for the caller's thread: the
+         * exception unwinds past every native frame in between, leaving the
+         * runtime (ART in particular) with a stack that no longer matches its
+         * own bookkeeping. Report it as a normal error instead.
+         */
+        if (virtualAddress.isNull()) {
+            raise(`couldn't invoke method ${this.class.fullName}::${this.name} as it has a NULL virtual address`);
+        }
+
+        return new NativeFunction(virtualAddress, this.returnType.fridaAlias, this.fridaSignature as NativeFunctionArgumentType[]);
     }
 
     /** Gets the encompassing object of the current method. */
@@ -212,6 +222,10 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
 
     /** Replaces the body of this method. */
     set implementation(block: (this: (Class | Il2CppObject | ValueType) & { currentMethod: Method<T, P> }, ...parameters: P) => T) {
+        if (this.virtualAddress.isNull()) {
+            raise(`couldn't set implementation for method ${this.class.fullName}::${this.name} as it has a NULL virtual address`);
+        }
+
         try {
             Interceptor.replace(this.virtualAddress, this.wrap(block));
         } catch (e: any) {
@@ -256,6 +270,9 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
         const allocatedParameters = parameters.map(toFridaValue);
 
         if (!this.isStatic) {
+            if (ptr(instance as any).isNull()) {
+                raise(`couldn't invoke method ${this.class.fullName}::${this.name} on a NULL instance`);
+            }
             allocatedParameters.unshift(instance);
         }
 

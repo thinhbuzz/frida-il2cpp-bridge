@@ -6,7 +6,7 @@ import { Domain, domain } from './structs/domain';
 import { Method } from './structs/method';
 import { Parameter } from './structs/parameter';
 import { mainThread, Thread } from './structs/thread';
-import { inform } from './utils/console';
+import { inform, raise } from './utils/console';
 
 export class Tracer {
 
@@ -309,6 +309,10 @@ export function trace(parameters: boolean = false): TracerConfigure {
 
         method.revert();
         const nativeCallback = new NativeCallback(callback, method.returnType.fridaAlias, method.fridaSignature);
+        if (method.virtualAddress.isNull()) {
+            raise(`couldn't trace method ${method.class.fullName}::${method.name} as it has a NULL virtual address`);
+        }
+
         Interceptor.replace(method.virtualAddress, nativeCallback);
     };
 
