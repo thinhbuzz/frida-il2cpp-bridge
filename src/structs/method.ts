@@ -14,6 +14,7 @@ import {
 } from '../api';
 import { fromFridaValue, toFridaValue } from '../memory';
 import { module } from '../module';
+import { protectManagedStack } from '../utils/art-managed-stack';
 import { raise, warn } from '../utils/console';
 import { getter } from '../utils/getter';
 import { lazy, lazyValue } from '../utils/lazy';
@@ -280,10 +281,20 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
             allocatedParameters.push(this.handle);
         }
 
+        /*
+         * A fault inside the callee unwinds past every native frame in
+         * between, which leaves runtime bookkeeping - ART's ManagedStack in
+         * particular - describing frames that no longer exist. Put back what
+         * was there before the call, so the next stack walk or GC does not
+         * follow a pointer into memory that has been recycled since.
+         */
+        const restoreManagedStack = protectManagedStack();
+
         try {
             const returnValue = this.nativeFunction(...allocatedParameters);
             return fromFridaValue(returnValue, this.returnType) as T;
         } catch (e: any) {
+            restoreManagedStack?.();
             if (e == null) {
                 raise('an unexpected native invocation exception occurred, this is due to parameter types mismatch');
             }
