@@ -49,57 +49,39 @@ function isManagedCode (address: NativePointer): boolean {
 
 let needsGuard: boolean | null = null;
 
-function androidVersion (): { level: number; source: string } {
-    /*
-     * The Java bridge, bundled alongside this one, publishes the release it
-     * detected.  Failing that, `Java.androidVersion` answers the same question
-     * when the host exposes the bridge globally, and failing that, a symbol
-     * that only exists from Android 15 on tells us what we need to know.
-     */
-    const published = (globalThis as any).__fridaJavaApiLevel;
-    if (typeof published === 'number' && published > 0) {
-        return { level: published, source: 'java bridge' };
-    }
+/**
+ * Which Android release this is, read from the system property exactly like
+ * frida-java-bridge does it.
+ */
+function androidApiLevel (): number {
+    const get = new NativeFunction(
+        Process.getModuleByName('libc.so').getExportByName('__system_property_get'),
+        'int',
+        ['pointer', 'pointer'],
+    );
 
-    const java = (globalThis as any).Java;
-    if (java !== undefined) {
-        try {
-            if (java.available === true) {
-                const level = parseInt(java.androidVersion, 10);
-                if (!isNaN(level)) {
-                    return { level, source: 'Java.androidVersion' };
-                }
-            }
-        } catch (e) {
-            /* The VM is not up yet: fall through. */
-        }
-    }
+    const value = Memory.alloc(92);
+    get(Memory.allocUtf8String('ro.build.version.sdk'), value);
 
-    const art = Process.findModuleByName('libart.so');
-    if (art !== null && art.findExportByName('_ZNK3art6Thread19DecodeGlobalJObjectEP8_jobject') !== null) {
-        return { level: 15, source: 'libart symbol' };
-    }
-
-    return { level: 0, source: 'unknown' };
+    return parseInt(value.readUtf8String() ?? '', 10) || 0;
 }
 
 /**
  * Whether this device needs the guard at all.  The abandoned-frame problem only
- * appears on Android 15 and later, and on anything older the stock behaviour -
- * a catchable JavaScript error - is kept, so nothing is installed there.
+ * appears on Android 15 and later; on anything older nothing is installed, and
+ * a fault stays what it always was - an error the caller can catch.
  */
 export function guardedInvocations (): boolean {
     if (needsGuard === null) {
-        let detected = { level: 0, source: 'unknown' };
+        let level = 0;
         try {
-            detected = androidVersion();
+            level = androidApiLevel();
         } catch (e) {
             /* Leave it off. */
         }
 
-        needsGuard = detected.level >= 15;
-        warn('[il2cpp-fault-guard] ' + (needsGuard ? 'enabled' : 'disabled') +
-            ' (Android ' + detected.level + ', detected via ' + detected.source + ')');
+        needsGuard = level >= 15;
+        warn('[il2cpp-fault-guard] ' + (needsGuard ? 'enabled' : 'disabled') + ' (Android ' + level + ')');
     }
 
     return needsGuard;
@@ -140,7 +122,15 @@ export function installFaultGuard (): void {
                 return false;
             }
 
+            /*
+             * Only the near-null dereferences this game produces are stepped
+             * over; stepping over a wild address was measured to break the
+             * game instead of saving it.
+             */
             const accessed = (details as any).memory?.address as NativePointer | undefined;
+            if (accessed !== undefined && accessed.compare(ptr('0x100000')) >= 0) {
+                return false;
+            }
 
             let size = 4;
             try {
