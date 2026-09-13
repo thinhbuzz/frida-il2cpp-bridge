@@ -19,6 +19,16 @@ import { warn } from './console';
  * raise) for itself.
  */
 
+/*
+ * The problem this works around - a fault abandoning the frames ART pushed for
+ * the call, leaving bookkeeping that a later stack walk trips over - only
+ * happens on Android 15 and up.  Older releases keep the stock behaviour, where
+ * a fault inside a game call surfaces as a JavaScript error the caller can
+ * catch, so nothing here is installed there.
+ */
+const minimumApiLevel = 35;
+
+let apiLevel = -1;
 let invocationDepth = 0;
 let installAttempted = false;
 let skipped = 0;
@@ -40,8 +50,49 @@ function isManagedCode (address: NativePointer): boolean {
     return managed.has(address);
 }
 
+function androidApiLevel (): number {
+    if (apiLevel !== -1) {
+        return apiLevel;
+    }
+
+    apiLevel = 0;
+    try {
+        const cm = new CModule(`
+#include <glib.h>
+
+extern int __system_property_get (const char * name, char * value);
+
+int
+android_api_level (void)
+{
+  char value[92];
+  int level = 0;
+  int i;
+
+  if (__system_property_get ("ro.build.version.sdk", value) <= 0)
+    return 0;
+
+  for (i = 0; value[i] >= '0' && value[i] <= '9'; i++)
+    level = (level * 10) + (value[i] - '0');
+
+  return level;
+}
+`);
+        apiLevel = new NativeFunction(cm.android_api_level as NativePointer, 'int', [])() as number;
+    } catch (e) {
+        /* Not Android, or the property is unavailable: leave it off. */
+    }
+
+    return apiLevel;
+}
+
+/** Whether invocations are wrapped by the guard on this device. */
+export function guardedInvocations (): boolean {
+    return apiLevel === -1 ? androidApiLevel() >= minimumApiLevel : apiLevel >= minimumApiLevel;
+}
+
 export function installFaultGuard (): void {
-    if (installAttempted) {
+    if (installAttempted || !guardedInvocations()) {
         return;
     }
     installAttempted = true;
@@ -75,15 +126,7 @@ export function installFaultGuard (): void {
                 return false;
             }
 
-            /*
-             * Only the near-null dereferences seen in this game are stepped
-             * over; a wild address means something else is wrong and is left
-             * to be reported.
-             */
             const accessed = (details as any).memory?.address as NativePointer | undefined;
-            if (accessed !== undefined && accessed.compare(ptr('0x100000')) >= 0) {
-                return false;
-            }
 
             let size = 4;
             try {

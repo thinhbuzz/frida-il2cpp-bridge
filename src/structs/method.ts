@@ -14,7 +14,7 @@ import {
 } from '../api';
 import { fromFridaValue, toFridaValue } from '../memory';
 import { module } from '../module';
-import { beginGuardedInvocation, endGuardedInvocation } from '../utils/fault-guard';
+import { beginGuardedInvocation, endGuardedInvocation, guardedInvocations } from '../utils/fault-guard';
 
 /*
  * Nothing is written to the runtime's stack bookkeeping: a fault inside a game
@@ -170,14 +170,19 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
         }
 
         /*
-         * `exceptions: 'propagate'` hands a fault to the process-wide handler
-         * instead of Frida's own error path, which is what lets the guard step
-         * over it and keep the native frames - and therefore ART's own stack
-         * bookkeeping - intact.
+         * Where the guard is active, `exceptions: 'propagate'` hands a fault to
+         * the process-wide handler instead of Frida's own error path, which is
+         * what lets it step over the fault and keep the native frames - and
+         * therefore ART's own stack bookkeeping - intact.  Everywhere else the
+         * default behaviour is kept, so a fault stays an error the caller can
+         * catch.
          */
-        return new NativeFunction(virtualAddress, this.returnType.fridaAlias, this.fridaSignature as NativeFunctionArgumentType[], {
-            exceptions: 'propagate',
-        });
+        return new NativeFunction(
+            virtualAddress,
+            this.returnType.fridaAlias,
+            this.fridaSignature as NativeFunctionArgumentType[],
+            guardedInvocations() ? { exceptions: 'propagate' } : undefined,
+        );
     }
 
     /** Gets the encompassing object of the current method. */
