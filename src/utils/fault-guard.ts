@@ -142,7 +142,7 @@ export function installFaultGuard (): void {
             details.context.pc = pc.add(size);
             skipped++;
 
-            if (skipped <= 20 || (skipped % 200) === 0) {
+            if (skipped <= 3 || (skipped % 1000) === 0) {
                 warn(`stepped over a fault at ${pc} (access to ${accessed ?? 'unknown'}) ` +
                     `inside a game call; ${skipped} so far`);
             }
