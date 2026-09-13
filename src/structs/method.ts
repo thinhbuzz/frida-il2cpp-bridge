@@ -14,17 +14,13 @@ import {
 } from '../api';
 import { fromFridaValue, toFridaValue } from '../memory';
 import { module } from '../module';
-import { protectManagedStack } from '../utils/art-managed-stack';
 import { beginGuardedInvocation, endGuardedInvocation } from '../utils/fault-guard';
 
 /*
- * Restoring the chain link only (not the quick frame or the shadow chain) was
- * measured as well: the S21 Ultra passed one run of three with it and three of
- * three without it, so nothing is written here at all. What is left are the
- * checks that refuse a NULL method pointer or a NULL instance, which only turn
- * a fatal fault into a JavaScript error.
+ * Nothing is written to the runtime's stack bookkeeping: a fault inside a game
+ * call is stepped over where it happens (see utils/fault-guard), which keeps
+ * every frame in place to begin with.
  */
-const protectManagedStackEnabled = false;
 import { raise, warn } from '../utils/console';
 
 /**
@@ -340,8 +336,10 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
             }
         }
 
-        const declared = this.parameters;
-        if (parameters.length === declared.length) {
+        const declared = (nullArgumentPolicy !== 'ignore' || this.nullArguments !== null)
+            ? this.parameters
+            : [];
+        if (declared.length !== 0 && parameters.length === declared.length) {
             for (let i = 0; i !== declared.length; i++) {
                 let skip: boolean;
                 try {
@@ -390,24 +388,11 @@ export class Method<T extends MethodReturnType = MethodReturnType, P extends Par
             }
         }
 
-        const restoreManagedStack = protectManagedStackEnabled ? protectManagedStack() : null;
-
         beginGuardedInvocation();
         try {
             const returnValue = this.nativeFunction(...allocatedParameters);
             return fromFridaValue(returnValue, this.returnType) as T;
         } catch (e: any) {
-            /*
-             * Only a native fault abandons the frames the managed stack still
-             * refers to. An ordinary error travels back through those frames
-             * and leaves the bookkeeping correct - and the frames may even
-             * still be live, because JavaScript can be re-entered from them -
-             * so putting the captured state back there would drop a chain that
-             * is still in use and wedge the thread.
-             */
-            if (e?.message?.includes('access violation')) {
-                restoreManagedStack?.();
-            }
             if (e == null) {
                 raise('an unexpected native invocation exception occurred, this is due to parameter types mismatch');
             }

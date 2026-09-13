@@ -58,6 +58,15 @@ export function installFaultGuard (): void {
             }
 
             /*
+             * A fault on the instruction fetch itself means the call went to a
+             * bad address; stepping over it would run whatever happens to be
+             * there next, so it is left alone.
+             */
+            if ((details as any).memory?.operation === 'execute') {
+                return false;
+            }
+
+            /*
              * ART performs its implicit null checks with a fault too, so
              * anything that faults inside code it manages is left to it.
              */
