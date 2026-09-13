@@ -26,9 +26,6 @@ import { warn } from './console';
  * a fault inside a game call surfaces as a JavaScript error the caller can
  * catch, so nothing here is installed there.
  */
-const minimumApiLevel = 35;
-
-let apiLevel = -1;
 let invocationDepth = 0;
 let installAttempted = false;
 let skipped = 0;
@@ -50,45 +47,62 @@ function isManagedCode (address: NativePointer): boolean {
     return managed.has(address);
 }
 
-function androidApiLevel (): number {
-    if (apiLevel !== -1) {
-        return apiLevel;
+let needsGuard: boolean | null = null;
+
+function androidVersion (): { level: number; source: string } {
+    /*
+     * The Java bridge, bundled alongside this one, publishes the release it
+     * detected.  Failing that, `Java.androidVersion` answers the same question
+     * when the host exposes the bridge globally, and failing that, a symbol
+     * that only exists from Android 15 on tells us what we need to know.
+     */
+    const published = (globalThis as any).__fridaJavaApiLevel;
+    if (typeof published === 'number' && published > 0) {
+        return { level: published, source: 'java bridge' };
     }
 
-    apiLevel = 0;
-    try {
-        const cm = new CModule(`
-#include <glib.h>
-
-extern int __system_property_get (const char * name, char * value);
-
-int
-android_api_level (void)
-{
-  char value[92];
-  int level = 0;
-  int i;
-
-  if (__system_property_get ("ro.build.version.sdk", value) <= 0)
-    return 0;
-
-  for (i = 0; value[i] >= '0' && value[i] <= '9'; i++)
-    level = (level * 10) + (value[i] - '0');
-
-  return level;
-}
-`);
-        apiLevel = new NativeFunction(cm.android_api_level as NativePointer, 'int', [])() as number;
-    } catch (e) {
-        /* Not Android, or the property is unavailable: leave it off. */
+    const java = (globalThis as any).Java;
+    if (java !== undefined) {
+        try {
+            if (java.available === true) {
+                const level = parseInt(java.androidVersion, 10);
+                if (!isNaN(level)) {
+                    return { level, source: 'Java.androidVersion' };
+                }
+            }
+        } catch (e) {
+            /* The VM is not up yet: fall through. */
+        }
     }
 
-    return apiLevel;
+    const art = Process.findModuleByName('libart.so');
+    if (art !== null && art.findExportByName('_ZNK3art6Thread19DecodeGlobalJObjectEP8_jobject') !== null) {
+        return { level: 15, source: 'libart symbol' };
+    }
+
+    return { level: 0, source: 'unknown' };
 }
 
-/** Whether invocations are wrapped by the guard on this device. */
+/**
+ * Whether this device needs the guard at all.  The abandoned-frame problem only
+ * appears on Android 15 and later, and on anything older the stock behaviour -
+ * a catchable JavaScript error - is kept, so nothing is installed there.
+ */
 export function guardedInvocations (): boolean {
-    return apiLevel === -1 ? androidApiLevel() >= minimumApiLevel : apiLevel >= minimumApiLevel;
+    if (needsGuard === null) {
+        let detected = { level: 0, source: 'unknown' };
+        try {
+            detected = androidVersion();
+        } catch (e) {
+            /* Leave it off. */
+        }
+
+        needsGuard = detected.level >= 15;
+        warn('[il2cpp-fault-guard] ' + (needsGuard ? 'enabled' : 'disabled') +
+            ' (Android ' + detected.level + ', detected via ' + detected.source + ')');
+    }
+
+    return needsGuard;
 }
 
 export function installFaultGuard (): void {
