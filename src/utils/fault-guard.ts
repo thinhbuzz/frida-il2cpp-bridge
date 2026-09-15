@@ -177,7 +177,7 @@ function installArtSignalStackMitigation (): void {
     }
 
     if (Process.arch !== 'arm64') {
-        console.log('[art-signal-stack] not patching ART on ' + Process.arch);
+        warn('[art-signal-stack] not patching ART on ' + Process.arch);
         return;
     }
 
@@ -199,7 +199,7 @@ function installArtSignalStackMitigation (): void {
     }
 
     if (address === null) {
-        console.log('[art-signal-stack] ART 16 alt-stack madvise abort: symbol not found, leaving ART alone');
+        warn('[art-signal-stack] ART 16 alt-stack madvise abort: symbol not found, leaving ART alone');
         return;
     }
 
@@ -217,7 +217,7 @@ function installArtSignalStackMitigation (): void {
 
     const patchedMnemonics = ['paciasp', 'sub', 'stp', 'str', 'mov'];
     if (patchedMnemonics.indexOf(prologue) === -1) {
-        console.log('[art-signal-stack] unexpected prologue "' + prologue + '" at ' + address + ', leaving ART alone');
+        warn('[art-signal-stack] unexpected prologue "' + prologue + '" at ' + address + ', leaving ART alone');
         return;
     }
 
@@ -232,10 +232,8 @@ function installArtSignalStackMitigation (): void {
             writer.flush();
         });
 
-        console.log('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
         warn('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
     } catch (e) {
-        console.log('[art-signal-stack] could not neutralise the ART alt-stack madvise abort: ' + e);
         warn('could not neutralise the ART alt-stack madvise abort: ' + e);
     }
 }
@@ -289,7 +287,7 @@ export function installFaultGuard (): void {
     buildManagedMap();
 
     if (guardApiLevel > MAX_API_LEVEL_WITH_JS_HANDLER) {
-        console.log('[il2cpp-fault-guard] Android ' + guardApiLevel +
+        warn('[il2cpp-fault-guard] Android ' + guardApiLevel +
             ': no exception handler, so ART keeps the whole signal stack');
         installArtSignalStackMitigation();
         return;
