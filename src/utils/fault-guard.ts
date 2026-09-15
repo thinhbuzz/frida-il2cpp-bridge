@@ -26,13 +26,44 @@ import { warn } from './console';
  * a fault inside a game call surfaces as a JavaScript error the caller can
  * catch, so nothing here is installed there.
  */
-let invocationDepth = 0;
+
+/*
+ * Everything below runs inside `Process.setExceptionHandler`, i.e. inside a
+ * signal handler that Frida's exceptor installed with SA_ONSTACK, which means
+ * the callback gets the ~32 KB alternate signal stack and nothing else.
+ *
+ * That budget is smaller than a single Java call: ART's generic JNI trampoline
+ * reserves 0x1400 bytes of stack on its own (plus the 224 byte save-refs frame
+ * and the interpreter frames), so a `Java.perform` from in here - which is what
+ * the warn logger used to do, through sendBroadcast - walks straight through
+ * the guard page below the signal stack.  SIGSEGV is already being handled at
+ * that point, so the second fault is fatal, and the tombstone reads "stack
+ * pointer is not in a rw map; likely due to stack overflow" with the crash
+ * sitting in artQuickGenericJniTrampoline.
+ *
+ * So: no JNI, no Java, no logging that reaches Java from in here.  Faults are
+ * only recorded in a plain JS array and flushed from ordinary JS turns - the
+ * timer installed alongside the guard, and the invocation wrappers - where a
+ * normal stack is available again.
+ */
+
+const MAX_PENDING_LOGS = 64;
+
+let invocationDepth = new Map<number, number>();
 let installAttempted = false;
 let skipped = 0;
 let managed: ModuleMap | null = null;
+let managedUnavailable = false;
+let flushTimer: any = null;
 
-function isManagedCode (address: NativePointer): boolean {
-    if (managed === null) {
+const pendingFaultLogs: string[] = [];
+
+/**
+ * Built before the handler can ever run: constructing a ModuleMap inside a
+ * signal handler is far too much work for the signal stack.
+ */
+function buildManagedMap (): void {
+    try {
         managed = new ModuleMap(module => {
             const path = module.path ?? module.name;
             return path.includes('oat') ||
@@ -42,12 +73,146 @@ function isManagedCode (address: NativePointer): boolean {
                 path.endsWith('.jar') ||
                 path.endsWith('.apk');
         });
+    } catch (e) {
+        managedUnavailable = true;
+        warn('could not build the managed-code map: ' + e);
+    }
+}
+
+function isManagedCode (address: NativePointer): boolean {
+    if (managed === null) {
+        /*
+         * Without the map there is no way to tell ART's implicit null checks
+         * apart from a game fault, and touching a managed frame is the one
+         * thing that must not happen: let ART deal with it.
+         */
+        return true;
     }
 
     return managed.has(address);
 }
 
+/**
+ * Signal-handler safe: nothing here may allocate a Java call.
+ */
+function queueFaultLog (message: string): void {
+    if (pendingFaultLogs.length < MAX_PENDING_LOGS) {
+        pendingFaultLogs.push(message);
+    }
+}
+
+/**
+ * Called from ordinary JS turns only.  The warn logger reaches Java
+ * (sendBroadcast), so it must never run on the signal stack.
+ */
+export function flushFaultLogs (): void {
+    if (pendingFaultLogs.length === 0) {
+        return;
+    }
+
+    const logs = pendingFaultLogs.splice(0, pendingFaultLogs.length);
+    for (const log of logs) {
+        try {
+            warn(log);
+        } catch (e) {
+            /* A broken logger must never break a game call. */
+        }
+    }
+}
+
 let needsGuard: boolean | null = null;
+let guardApiLevel = 0;
+
+/*
+ * ART 16 handles a fault on the alternate signal stack, and that stack is only
+ * 32 KB: Frida's exceptor builds the exception details and enters V8 before the
+ * fault ever reaches ART, so a deep path inside ART's own handler (constructing
+ * an exception and filling in its stack trace) runs off the bottom of it and the
+ * process dies with "stack pointer is not in a rw map".  Measured on the Pixel 6
+ * Pro (Android 16) that happens within minutes, while the same build ran for
+ * fourteen hours on Android 15 with the handler in place - so the step-over is
+ * only kept where it has the room for it.
+ */
+const MAX_API_LEVEL_WITH_JS_HANDLER = 15;
+
+/*
+ * Android 16's ART aborts the process from
+ * `Thread::MadviseAwayAlternateSignalStack()`, which runs from the implicit
+ * suspend check that every JNI transition performs:
+ *
+ *     void Thread::MadviseAwayAlternateSignalStack() {
+ *       stack_t old_ss;
+ *       sigaltstack(nullptr, &old_ss);
+ *       if ((old_ss.ss_flags & SS_DISABLE) == 0 && page aligned) {
+ *         CHECK_EQ(old_ss.ss_flags & SS_ONSTACK, 0);   // <-- aborts
+ *         madvise(old_ss.ss_sp, old_ss.ss_size, MADV_DONTNEED);
+ *       }
+ *     }
+ *
+ * The check is meant to stop ART from madvising away the very stack it is
+ * running on, and the tombstone reads:
+ *
+ *     Abort message: 'Check failed: old_ss.ss_flags & 1 == 0
+ *                     (old_ss.ss_flags & 1=1, 0=0)'
+ *
+ * A thread is on that stack whenever it is inside a signal handler, because
+ * both ART's sigchain and Frida's exceptor install their handlers with
+ * SA_ONSTACK - so any runtime code running below a fault handler trips the
+ * check.  On this game the window is wide: it faults on null pointers often
+ * enough that the fault guard above exists, and every one of those faults runs
+ * the handler chain on the alternate signal stack.
+ *
+ * Skipping the madvise is what the check asks for and costs nothing but a few
+ * pages of stack that stay resident, so the function is replaced with a version
+ * that returns early instead of aborting.  Nothing here runs on the signal
+ * stack itself: the replacement is plain native code.
+ */
+const MADVISE_AWAY_SYMBOL = '_ZN3art6Thread31MadviseAwayAlternateSignalStackEv';
+
+function installArtSignalStackMitigation (): void {
+    let address: NativePointer | null = null;
+    try {
+        const art = Process.getModuleByName('libart.so');
+
+        // ART keeps this one in the dynamic symbol table, but not in the symbol
+        // dump Frida's enumerateSymbols() walks.
+        address = art.findExportByName(MADVISE_AWAY_SYMBOL);
+        if (address === null) {
+            const symbol = art.enumerateSymbols().find(s => s.name === MADVISE_AWAY_SYMBOL);
+            if (symbol !== undefined) {
+                address = symbol.address;
+            }
+        }
+    } catch (e) {
+        /* Leave ART alone if it cannot even be inspected. */
+    }
+
+    if (address === null) {
+        console.log('[art-signal-stack] ART 16 alt-stack madvise abort: symbol not found, leaving ART alone');
+        return;
+    }
+
+    /*
+     * The body is only the `madvise()` above, so turning the entry point into a
+     * plain `ret` drops the whole optimisation - which is exactly what has to
+     * happen when the thread is on the stack being madvised away.  A single
+     * 4-byte store is atomic on arm64, so threads running through the function
+     * while it is patched are not disturbed; replacing it through the
+     * interceptor instead is not safe here, because the function sits right on
+     * the JNI transition path that every thread walks.
+     */
+    try {
+        Memory.protect(address, 16, 'rwx');
+        address.writeU32(0xd65f03c0); /* ret */
+
+        console.log('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
+        warn('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
+    } catch (e) {
+        console.log('[art-signal-stack] could not neutralise the ART alt-stack madvise abort: ' + e);
+        warn('could not neutralise the ART alt-stack madvise abort: ' + e);
+    }
+}
+
 
 /**
  * Which Android release this is, read from the system property exactly like
@@ -80,6 +245,7 @@ export function guardedInvocations (): boolean {
             /* Leave it off. */
         }
 
+        guardApiLevel = level;
         needsGuard = level >= 15;
         warn('[il2cpp-fault-guard] ' + (needsGuard ? 'enabled' : 'disabled') + ' (Android ' + level + ')');
     }
@@ -93,9 +259,19 @@ export function installFaultGuard (): void {
     }
     installAttempted = true;
 
+    buildManagedMap();
+
+    if (guardApiLevel > MAX_API_LEVEL_WITH_JS_HANDLER) {
+        console.log('[il2cpp-fault-guard] Android ' + guardApiLevel +
+            ': no exception handler, so ART keeps the whole signal stack');
+        installArtSignalStackMitigation();
+        return;
+    }
+
     try {
         Process.setExceptionHandler(details => {
-            if (invocationDepth === 0) {
+            const depth = invocationDepth.get(Process.getCurrentThreadId());
+            if (depth === undefined || depth === 0) {
                 return false;
             }
 
@@ -118,7 +294,7 @@ export function installFaultGuard (): void {
              * anything that faults inside code it manages is left to it.
              */
             const pc = details.context.pc;
-            if (isManagedCode(pc)) {
+            if (managedUnavailable || isManagedCode(pc)) {
                 return false;
             }
 
@@ -143,7 +319,7 @@ export function installFaultGuard (): void {
             skipped++;
 
             if (skipped <= 3 || (skipped % 1000) === 0) {
-                warn(`stepped over a fault at ${pc} (access to ${accessed ?? 'unknown'}) ` +
+                queueFaultLog(`stepped over a fault at ${pc} (access to ${accessed ?? 'unknown'}) ` +
                     `inside a game call; ${skipped} so far`);
             }
 
@@ -152,17 +328,47 @@ export function installFaultGuard (): void {
     } catch (e) {
         warn('could not install the fault guard: ' + e);
     }
+
+    /*
+     * Flushing from a timer keeps the messages flowing even when the game does
+     * not call anything else afterwards.
+     */
+    try {
+        flushTimer = setInterval(flushFaultLogs, 1000);
+    } catch (e) {
+        /* The invocation wrappers flush instead. */
+    }
+
+    installArtSignalStackMitigation();
 }
 
 export function beginGuardedInvocation (): void {
-    if (invocationDepth === 0) {
+    if (invocationDepth.size === 0) {
         installFaultGuard();
     }
-    invocationDepth++;
+
+    /*
+     * Ordinary JS turn: this is where the messages the handler buffered are
+     * finally allowed to reach Java.
+     */
+    flushFaultLogs();
+
+    const tid = Process.getCurrentThreadId();
+    invocationDepth.set(tid, (invocationDepth.get(tid) ?? 0) + 1);
 }
 
 export function endGuardedInvocation (): void {
-    if (invocationDepth !== 0) {
-        invocationDepth--;
+    const tid = Process.getCurrentThreadId();
+    const depth = invocationDepth.get(tid);
+    if (depth === undefined) {
+        return;
     }
+
+    if (depth <= 1) {
+        invocationDepth.delete(tid);
+    } else {
+        invocationDepth.set(tid, depth - 1);
+    }
+
+    flushFaultLogs();
 }
