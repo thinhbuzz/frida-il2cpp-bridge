@@ -163,13 +163,24 @@ const MAX_API_LEVEL_WITH_JS_HANDLER = 15;
  * the handler chain on the alternate signal stack.
  *
  * Skipping the madvise is what the check asks for and costs nothing but a few
- * pages of stack that stay resident, so the function is replaced with a version
- * that returns early instead of aborting.  Nothing here runs on the signal
- * stack itself: the replacement is plain native code.
+ * pages of stack that stay resident, so the entry point is turned into a plain
+ * return.  The body does nothing else, and the alternative - replacing the
+ * function through the interceptor - is not worth it here: it sits on the JNI
+ * transition path that every thread walks.
  */
 const MADVISE_AWAY_SYMBOL = '_ZN3art6Thread31MadviseAwayAlternateSignalStackEv';
 
 function installArtSignalStackMitigation (): void {
+    if (guardApiLevel < 16) {
+        /* Only ART 16 carries the check; older releases keep the optimisation. */
+        return;
+    }
+
+    if (Process.arch !== 'arm64') {
+        console.log('[art-signal-stack] not patching ART on ' + Process.arch);
+        return;
+    }
+
     let address: NativePointer | null = null;
     try {
         const art = Process.getModuleByName('libart.so');
@@ -193,17 +204,33 @@ function installArtSignalStackMitigation (): void {
     }
 
     /*
-     * The body is only the `madvise()` above, so turning the entry point into a
-     * plain `ret` drops the whole optimisation - which is exactly what has to
-     * happen when the thread is on the stack being madvised away.  A single
-     * 4-byte store is atomic on arm64, so threads running through the function
-     * while it is patched are not disturbed; replacing it through the
-     * interceptor instead is not safe here, because the function sits right on
-     * the JNI transition path that every thread walks.
+     * Only entries that look like an ordinary prologue are touched.  A `bti`
+     * landing pad in particular has to stay: indirect callers depend on it, and
+     * this build of ART starts the function with `paciasp`.
      */
+    let prologue = '';
     try {
-        Memory.protect(address, 16, 'rwx');
-        address.writeU32(0xd65f03c0); /* ret */
+        prologue = Instruction.parse(address).mnemonic;
+    } catch (e) {
+        /* Not decodable: leave it alone. */
+    }
+
+    const patchedMnemonics = ['paciasp', 'sub', 'stp', 'str', 'mov'];
+    if (patchedMnemonics.indexOf(prologue) === -1) {
+        console.log('[art-signal-stack] unexpected prologue "' + prologue + '" at ' + address + ', leaving ART alone');
+        return;
+    }
+
+    try {
+        /*
+         * The code writer flushes the instruction cache for us, which a plain
+         * store would not do.
+         */
+        Memory.patchCode(address, 4, code => {
+            const writer = new Arm64Writer(code, { pc: address as NativePointer });
+            writer.putRet();
+            writer.flush();
+        });
 
         console.log('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
         warn('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
