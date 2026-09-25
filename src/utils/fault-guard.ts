@@ -130,10 +130,28 @@ let guardApiLevel = 0;
  * an exception and filling in its stack trace) runs off the bottom of it and the
  * process dies with "stack pointer is not in a rw map".  Measured on the Pixel 6
  * Pro (Android 16) that happens within minutes, while the same build ran for
+/*
+ * ART 16 handles a fault on the alternate signal stack, and that stack is only
+ * 32 KB: Frida's exceptor builds the exception details and enters V8 before the
+ * fault ever reaches ART, so a deep path inside ART's own handler (constructing
+ * an exception and filling in its stack trace) runs off the bottom of it and the
+ * process dies with "stack pointer is not in a rw map".  Measured on the Pixel 6
+ * Pro (Android 16) that happens within minutes, while the same build ran for
  * fourteen hours on Android 15 with the handler in place - so the step-over is
  * only kept where it has the room for it.
+ *
+ * NOTE: everything in this file compares against `ro.build.version.sdk`, i.e.
+ * the *API level* (33 on Android 13, 35 on Android 15, 36 on Android 16).  The
+ * thresholds below used to be written as Android version numbers (15 / 16) and
+ * compared against that API level, which silently made every modern release
+ * "Android 15 and up" - so the JS handler was never installed on any device -
+ * and left the ART patch gated on a condition nothing could ever fail.
  */
-const MAX_API_LEVEL_WITH_JS_HANDLER = 15;
+const ANDROID_15_API_LEVEL = 35;
+const ANDROID_16_API_LEVEL = 36;
+
+/** Highest API level that still gets `Process.setExceptionHandler`. */
+const MAX_API_LEVEL_WITH_JS_HANDLER = ANDROID_15_API_LEVEL;
 
 /*
  * Android 16's ART aborts the process from
@@ -171,11 +189,14 @@ const MAX_API_LEVEL_WITH_JS_HANDLER = 15;
 const MADVISE_AWAY_SYMBOL = '_ZN3art6Thread31MadviseAwayAlternateSignalStackEv';
 
 function installArtSignalStackMitigation (): void {
-    if (guardApiLevel < 16) {
-        /* Only ART 16 carries the check; older releases keep the optimisation. */
-        return;
-    }
-
+    /*
+     * The check is not exclusive to ART 16 in practice: the LineageOS 20
+     * (Android 13, API 33) libart of the OnePlus 5T this was diagnosed on
+     * carries both `Thread::MadviseAwayAlternateSignalStack()` and its CHECK
+     * (verified with objdump/strings on the device's libart.so).  Whether the
+     * abort is reachable is answered by whether the symbol exists, which the
+     * lookup below checks, so no API level is compared here.
+     */
     if (Process.arch !== 'arm64') {
         warn('[art-signal-stack] not patching ART on ' + Process.arch);
         return;
@@ -199,7 +220,7 @@ function installArtSignalStackMitigation (): void {
     }
 
     if (address === null) {
-        warn('[art-signal-stack] ART 16 alt-stack madvise abort: symbol not found, leaving ART alone');
+        warn('[art-signal-stack] alt-stack madvise abort: symbol not found, leaving ART alone');
         return;
     }
 
@@ -271,7 +292,7 @@ export function guardedInvocations (): boolean {
         }
 
         guardApiLevel = level;
-        needsGuard = level >= 15;
+        needsGuard = level >= ANDROID_15_API_LEVEL;
         warn('[il2cpp-fault-guard] ' + (needsGuard ? 'enabled' : 'disabled') + ' (Android ' + level + ')');
     }
 
@@ -279,17 +300,32 @@ export function guardedInvocations (): boolean {
 }
 
 export function installFaultGuard (): void {
-    if (installAttempted || !guardedInvocations()) {
+    if (installAttempted) {
         return;
     }
     installAttempted = true;
+
+    const needed = guardedInvocations();
+
+    /*
+     * Frida's exceptor installs its own handler with SA_ONSTACK no matter what
+     * this build decides below, so a fault ART handles still runs the handler
+     * chain on the alternate signal stack.  The mitigation therefore follows the
+     * function, not the guard.
+     */
+    installArtSignalStackMitigation();
+
+    if (!needed) {
+        warn('[il2cpp-fault-guard] Android ' + guardApiLevel +
+            ': stock behaviour (the abandoned-frame problem starts at Android 15)');
+        return;
+    }
 
     buildManagedMap();
 
     if (guardApiLevel > MAX_API_LEVEL_WITH_JS_HANDLER) {
         warn('[il2cpp-fault-guard] Android ' + guardApiLevel +
             ': no exception handler, so ART keeps the whole signal stack');
-        installArtSignalStackMitigation();
         return;
     }
 
@@ -363,8 +399,6 @@ export function installFaultGuard (): void {
     } catch (e) {
         /* The invocation wrappers flush instead. */
     }
-
-    installArtSignalStackMitigation();
 }
 
 export function beginGuardedInvocation (): void {
