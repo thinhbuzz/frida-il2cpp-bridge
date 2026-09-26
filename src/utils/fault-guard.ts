@@ -20,11 +20,24 @@ import { warn } from './console';
  */
 
 /*
- * The problem this works around - a fault abandoning the frames ART pushed for
- * the call, leaving bookkeeping that a later stack walk trips over - only
- * happens on Android 15 and up.  Older releases keep the stock behaviour, where
- * a fault inside a game call surfaces as a JavaScript error the caller can
- * catch, so nothing here is installed there.
+ * This was believed to be an Android 15+ behaviour, so the guard used to be
+ * gated on the API level and everything older was left on Frida's default
+ * exception handling.  That gate is wrong: it was reasoned from two devices
+ * (Android 16 Pixel, Android 14 Samsung) rather than measured across releases,
+ * and a Redmi K50 Ultra on Android 12 (API 31) dies from exactly this, seven
+ * times in one session, with tombstones reading:
+ *
+ *   - `artQuickGenericJniEndTrampoline+72`: the thread's managed-stack top frame
+ *     is NULL, so the return path of a generic JNI call dereferences 0x0;
+ *   - `artQuickGenericJniEndTrampoline+332`: the top frame is a *stale* method,
+ *     so ART reads the wrong return type and treats the primitive a JNI method
+ *     returned as a reference, then reads an object header at 0x0;
+ *   - `art::StackVisitor::WalkStack` inside `MarkCompact::CheckpointMarkThreadRoots`:
+ *     a GC root visit walks the same abandoned frames.
+ *
+ * Every one of those runs has a game call that faulted (`access violation
+ * accessing 0x0`) a fraction of a second earlier, which is the unwind that
+ * abandons the frames.  The step-over is therefore installed on every release.
  */
 
 /*
@@ -52,6 +65,7 @@ const MAX_PENDING_LOGS = 64;
 let invocationDepth = new Map<number, number>();
 let installAttempted = false;
 let skipped = 0;
+let leftToRuntime = 0;
 let managed: ModuleMap | null = null;
 let managedUnavailable = false;
 let flushTimer: any = null;
@@ -130,28 +144,20 @@ let guardApiLevel = 0;
  * an exception and filling in its stack trace) runs off the bottom of it and the
  * process dies with "stack pointer is not in a rw map".  Measured on the Pixel 6
  * Pro (Android 16) that happens within minutes, while the same build ran for
-/*
- * ART 16 handles a fault on the alternate signal stack, and that stack is only
- * 32 KB: Frida's exceptor builds the exception details and enters V8 before the
- * fault ever reaches ART, so a deep path inside ART's own handler (constructing
- * an exception and filling in its stack trace) runs off the bottom of it and the
- * process dies with "stack pointer is not in a rw map".  Measured on the Pixel 6
- * Pro (Android 16) that happens within minutes, while the same build ran for
  * fourteen hours on Android 15 with the handler in place - so the step-over is
  * only kept where it has the room for it.
  *
  * NOTE: everything in this file compares against `ro.build.version.sdk`, i.e.
  * the *API level* (33 on Android 13, 35 on Android 15, 36 on Android 16).  The
- * thresholds below used to be written as Android version numbers (15 / 16) and
+ * threshold below used to be written as an Android version number (15) and
  * compared against that API level, which silently made every modern release
  * "Android 15 and up" - so the JS handler was never installed on any device -
  * and left the ART patch gated on a condition nothing could ever fail.
  */
-const ANDROID_15_API_LEVEL = 35;
 const ANDROID_16_API_LEVEL = 36;
 
 /** Highest API level that still gets `Process.setExceptionHandler`. */
-const MAX_API_LEVEL_WITH_JS_HANDLER = ANDROID_15_API_LEVEL;
+const MAX_API_LEVEL_WITH_JS_HANDLER = ANDROID_16_API_LEVEL - 1;
 
 /*
  * Android 16's ART aborts the process from
@@ -253,7 +259,8 @@ function installArtSignalStackMitigation (): void {
             writer.flush();
         });
 
-        warn('[art-signal-stack] ART 16 alt-stack madvise abort neutralised');
+        warn('[art-signal-stack] ART alt-stack madvise abort neutralised (prologue "' +
+            prologue + '")');
     } catch (e) {
         warn('could not neutralise the ART alt-stack madvise abort: ' + e);
     }
@@ -278,9 +285,13 @@ function androidApiLevel (): number {
 }
 
 /**
- * Whether this device needs the guard at all.  The abandoned-frame problem only
- * appears on Android 15 and later; on anything older nothing is installed, and
- * a fault stays what it always was - an error the caller can catch.
+ * Whether this device needs the guard at all.
+ *
+ * It always does.  A call made from JavaScript into game code is a native call
+ * that ART has frames under, so unwinding out of a fault inside it leaves the
+ * runtime describing frames that no longer exist on *every* release - newer
+ * ART only makes it easier to trip over.  The API level is still read, and
+ * still reported, because the handler is skipped on Android 16 and up.
  */
 export function guardedInvocations (): boolean {
     if (needsGuard === null) {
@@ -292,8 +303,8 @@ export function guardedInvocations (): boolean {
         }
 
         guardApiLevel = level;
-        needsGuard = level >= ANDROID_15_API_LEVEL;
-        warn('[il2cpp-fault-guard] ' + (needsGuard ? 'enabled' : 'disabled') + ' (Android ' + level + ')');
+        needsGuard = true;
+        warn('[il2cpp-fault-guard] enabled (Android ' + level + ')');
     }
 
     return needsGuard;
@@ -305,7 +316,7 @@ export function installFaultGuard (): void {
     }
     installAttempted = true;
 
-    const needed = guardedInvocations();
+    guardedInvocations();
 
     /*
      * Frida's exceptor installs its own handler with SA_ONSTACK no matter what
@@ -314,12 +325,6 @@ export function installFaultGuard (): void {
      * function, not the guard.
      */
     installArtSignalStackMitigation();
-
-    if (!needed) {
-        warn('[il2cpp-fault-guard] Android ' + guardApiLevel +
-            ': stock behaviour (the abandoned-frame problem starts at Android 15)');
-        return;
-    }
 
     buildManagedMap();
 
@@ -347,6 +352,11 @@ export function installFaultGuard (): void {
              * there next, so it is left alone.
              */
             if ((details as any).memory?.operation === 'execute') {
+                leftToRuntime++;
+                if (leftToRuntime <= 3 || (leftToRuntime % 1000) === 0) {
+                    queueFaultLog(`left an instruction-fetch fault at ${details.context.pc} ` +
+                        `to the runtime inside a game call; ${leftToRuntime} so far`);
+                }
                 return false;
             }
 
@@ -366,6 +376,11 @@ export function installFaultGuard (): void {
              */
             const accessed = (details as any).memory?.address as NativePointer | undefined;
             if (accessed !== undefined && accessed.compare(ptr('0x100000')) >= 0) {
+                leftToRuntime++;
+                if (leftToRuntime <= 3 || (leftToRuntime % 1000) === 0) {
+                    queueFaultLog(`left a fault at ${pc} (access to ${accessed}) to the ` +
+                        `runtime inside a game call; ${leftToRuntime} so far`);
+                }
                 return false;
             }
 
